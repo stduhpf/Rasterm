@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <math.h>
-#include <errno.h>
 
 #include "pot.h"
 #include "cup.h"
