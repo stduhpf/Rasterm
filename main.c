@@ -10,6 +10,73 @@
 #define HEIGHT 64
 #define WIDTH (HEIGHT * ASPECT)
 
+
+float buffer[WIDTH][HEIGHT][4] = {0};
+
+char *ascii = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
+int asciiLen = 92;
+
+char *color = "\033";
+
+const char *colors[8] = {"[1;30m", "[1;31m", "[1;32m", "[1;33m", "[1;34m", "[1;35m", "[1;36m", "[1;37m"};
+const char *bgcolors[8] = {"[1;40m", "[1;41m", "[1;42m", "[1;43m", "[1;44m", "[1;45m", "[1;46m", "[1;47m"};
+const int black = 0;
+const int red = 1;
+const int green = 2;
+const int yellow = 3;
+const int blue = 4;
+const int magenta = 5;
+const int cyan = 6;
+const int white = 7;
+
+char *defaultColor = "[0m";
+
+float lumaR = 0.2126;
+float lumaG = 0.7152;
+float lumaB = 0.0722;
+
+
+
+void print_grayscale(float buffer[WIDTH][HEIGHT][4])
+{
+    for (int j = 0; j < HEIGHT; j++)
+    {
+        for (int i = 0; i < WIDTH; i++)
+        {
+            float r = buffer[i][j][0];
+            r = r < 0. ? 0. : r;
+            float g = buffer[i][j][1];
+            g = g < 0. ? 0. : g;
+            float b = buffer[i][j][2];
+            b = b < 0. ? 0. : b;
+
+            float luma = (r * lumaR + g * lumaG + b * lumaB);
+
+            int charid = (int)(sqrtf(luma) * asciiLen);
+            if (charid >= asciiLen)
+                charid = asciiLen - 1;
+            if (charid < 0)
+                charid = 0;
+            printf("%c", ascii[charid]);
+        }
+        printf("\n%s%s", color, defaultColor);
+    }
+}
+
+void clearBuffer(float buffer[WIDTH][HEIGHT][4])
+{
+    for (int i = 0; i < WIDTH; i++)
+    {
+        for (int j = 0; j < HEIGHT; j++)
+        {
+            buffer[i][j][0] = 0;
+            buffer[i][j][1] = 0;
+            buffer[i][j][2] = 0;
+            buffer[i][j][3] = 0;
+        }
+    }
+}
+
 typedef struct
 {
     float x;
@@ -45,29 +112,8 @@ typedef struct
     Camera camera;
 } SceneAttributes;
 
-float buffer[WIDTH][HEIGHT][4] = {0};
 
-char *ascii = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
-int asciiLen = 92;
 
-char *color = "\033";
-
-const char *colors[8] = {"[1;30m", "[1;31m", "[1;32m", "[1;33m", "[1;34m", "[1;35m", "[1;36m", "[1;37m"};
-const char *bgcolors[8] = {"[1;40m", "[1;41m", "[1;42m", "[1;43m", "[1;44m", "[1;45m", "[1;46m", "[1;47m"};
-const int black = 0;
-const int red = 1;
-const int green = 2;
-const int yellow = 3;
-const int blue = 4;
-const int magenta = 5;
-const int cyan = 6;
-const int white = 7;
-
-char *defaultColor = "[0m";
-
-float lumaR = 0.2126;
-float lumaG = 0.7152;
-float lumaB = 0.0722;
 
 #define MIN(a, b) (a < b ? a : b)
 #define MAX(a, b) (a > b ? a : b)
@@ -302,7 +348,7 @@ void from_obj(int t)
 
     Camera camera = {cameraPosition, cameraRotXZ, cameraRotYZ, cameraFocalLength};
 
-    Vector3D lightVec = normalize((Vector3D){0, 1, 1.1});
+    Vector3D lightVec = normalize((Vector3D){0, 1, .3});
 
     SceneAttributes scene = {lightVec, {.999, .999, .99}, {.001, .001, .01}, camera};
 
@@ -322,6 +368,12 @@ void from_obj(int t)
         C = getWorldPos(C, worldOffset, rotateXY, rotateXZ, rotateYZ);
 
         triangle3D(A, B, C, (Vector3D){1, 1, 1}, scene);
+        
+       #ifdef STEP_RENDER 
+        printf("\033[%zuA", (size_t)HEIGHT);
+        printf("\033[%zuD", (size_t)WIDTH);
+        print_grayscale(buffer);
+       #endif 
     }
 
     for (int f = 0; f < faces_count_cup; f++)
@@ -341,48 +393,15 @@ void from_obj(int t)
         C = getWorldPos(C, worldOffset, rotateXY, rotateXZ, rotateYZ);
 
         triangle3D(A, B, C, (Vector3D){1, 1, 1}, scene);
+        
+       #ifdef STEP_RENDER 
+        printf("\033[%zuA", (size_t)HEIGHT);
+        printf("\033[%zuD", (size_t)WIDTH);
+        print_grayscale(buffer);
+       #endif 
     }
 }
 
-void print_grayscale(float buffer[WIDTH][HEIGHT][4])
-{
-    for (int j = 0; j < HEIGHT; j++)
-    {
-        for (int i = 0; i < WIDTH; i++)
-        {
-            float r = buffer[i][j][0];
-            r = r < 0. ? 0. : r;
-            float g = buffer[i][j][1];
-            g = g < 0. ? 0. : g;
-            float b = buffer[i][j][2];
-            b = b < 0. ? 0. : b;
-
-            float luma = (r * lumaR + g * lumaG + b * lumaB);
-
-            int charid = (int)(sqrtf(luma) * asciiLen);
-            if (charid >= asciiLen)
-                charid = asciiLen - 1;
-            if (charid < 0)
-                charid = 0;
-            printf("%c", ascii[charid]);
-        }
-        printf("\n%s%s", color, defaultColor);
-    }
-}
-
-void clearBuffer(float buffer[WIDTH][HEIGHT][4])
-{
-    for (int i = 0; i < WIDTH; i++)
-    {
-        for (int j = 0; j < HEIGHT; j++)
-        {
-            buffer[i][j][0] = 0;
-            buffer[i][j][1] = 0;
-            buffer[i][j][2] = 0;
-            buffer[i][j][3] = 0;
-        }
-    }
-}
 
 int main()
 {

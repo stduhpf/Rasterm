@@ -35,3 +35,6 @@ It produces images like this:
           RRHH
 
 ```
+## Optionnal flags
+
+- `-DSTEP_RENDER` : Refreshes the display after deach triangle drawn
