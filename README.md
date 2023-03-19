@@ -37,4 +37,8 @@ It produces images like this:
 ```
 ## Optionnal flags
 
-- `-DSTEP_RENDER` : Refreshes the display after deach triangle drawn
+- `-DFRAMES=[n]`                     : Draws n consecutive animated frames (recommended) (default: 1)
+- `-DRENDER_TARGET=[GRAYSCALE|COLOR]`: Change output mode (default: GRAYSCALE)
+- `-DSTEP_RENDER`                    : Refreshes the display after each triangle drawn on canvas (looks cool, but is very slow)
+- `-DHEIGHT=[int]`                   : change size of canvas (default value:64)
+- `-DASPECT=[float]`                 : to adapt to the "aspect ratio" of the font used in terminal (default 2.25)  (controls the width indirectly)
