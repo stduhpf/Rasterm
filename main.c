@@ -524,7 +524,7 @@ int main()
     for (int t = 0; t < FRAMES; t++)
     {
         from_obj(t);
-        print_color(buffer);
+        print(buffer);
         usleep(1000 * 1000 / 60);
         printf("\033[%zuA", (size_t)HEIGHT);
         printf("\033[%zuD", (size_t)WIDTH);
