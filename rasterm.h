@@ -1,8 +1,15 @@
+#ifndef RASTERM
+#define RASTERM
+
 #ifndef HEIGHT
 #define HEIGHT 64
 #endif
 #ifndef WIDTH
 #define WIDTH 64
+#endif
+
+#ifndef ASPECT_RATIO
+#define ASPECT_RATIO 1
 #endif
 
 typedef struct
@@ -276,7 +283,7 @@ Vector3D project(Vector3D p, const float screenZ)
     Vector3D ret = {0, 0, 0};
     p.z = p.z;
     ret.x = (.5 + .5 * screenZ * p.x / p.z) * WIDTH;
-    ret.y = (.5 + .5 * screenZ * p.y / p.z) * HEIGHT;
+    ret.y = ((.5 + .5 * screenZ * p.y / p.z) * ASPECT_RATIO + (1.0f - ASPECT_RATIO) * .5) * HEIGHT;
     ret.z = screenZ / p.z;
     return ret;
 }
@@ -306,4 +313,5 @@ void triangle3D(float buffer[WIDTH][HEIGHT][4], Vector3D A, Vector3D B, Vector3D
     triangle2D(buffer, a, b, c, Ap.z, Bp.z, Cp.z, attribs, scene);
 }
 
+#endif
 #endif
