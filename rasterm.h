@@ -68,6 +68,7 @@ void resetFragmentShader();
 
 static void defaultFragmentShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
 {
+    // default shader: simple lambertian diffuse with solid color
     float illumination = 1.;
     if (dot(attribs.normal, attribs.normal) > 0.)
     {

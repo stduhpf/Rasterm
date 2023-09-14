@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <math.h>
 
+#include <omp.h>
+
 #ifdef WIN32
 #include <windows.h>
 
@@ -24,15 +26,15 @@ void usleep(__int64 usec)
 #include "pot.h"
 #include "cup.h"
 
-#ifndef ASPECT
-#define ASPECT 2.25
+#ifndef PX_ASPECT
+#define PX_ASPECT 2.25
 #endif
 
 #ifndef HEIGHT
 #define HEIGHT 64
 #endif
 #ifndef WIDTH
-#define WIDTH ((int)(HEIGHT * ASPECT))
+#define WIDTH ((int)(HEIGHT * PX_ASPECT))
 #endif
 
 #define PERSPECTIVE_UV // enable perspective texture mapping
@@ -71,6 +73,7 @@ void from_obj(float buffer[WIDTH][HEIGHT][4], int t)
 
     SceneAttributes scene = {lightVec, (Vector3D){.999, .999, .995}, (Vector3D){.005, .005, .01}, camera};
 
+// #pragma omp parallel for
     for (int f = 0; f < faces_count_pot; f++)
     {
         const float rotateXY = 0.4;
@@ -183,9 +186,11 @@ Vector2D toCocg(Vector3D rgb)
 
 void print_color(float buffer[WIDTH][HEIGHT][4])
 {
-    for (int j = 0; j < HEIGHT; j++)
+    int termColorBuffer[WIDTH][HEIGHT][2];
+    #pragma omp parallel for
+    for (int i = 0; i < WIDTH; i++)
     {
-        for (int i = 0; i < WIDTH; i++)
+        for (int j = 0; j < HEIGHT; j++)
         {
             float db = bayer(i, j, 4);
             float dr = bayer(i, j, 5);
@@ -200,7 +205,8 @@ void print_color(float buffer[WIDTH][HEIGHT][4])
             float luma = (r * lumaR + g * lumaG + b * lumaB);
             if (luma == 0)
             {
-                printf(" ");
+                termColorBuffer[i][j][0] = 0;
+                termColorBuffer[i][j][1] = 0;
                 continue;
             }
 
@@ -234,6 +240,17 @@ void print_color(float buffer[WIDTH][HEIGHT][4])
                 charid = asciiLen - 1;
             if (charid < 0)
                 charid = 0;
+            termColorBuffer[i][j][0] = charColor;
+            termColorBuffer[i][j][1] = charid;
+        }
+    }
+    for (int j = 0; j < HEIGHT; j++)
+    {
+        for (int i = 0; i < WIDTH; i++)
+        {
+            int charColor = termColorBuffer[i][j][0];
+            int charid = termColorBuffer[i][j][1];
+            // TODO: use string concatenation to avoid spamming stdout
             printf("%s%s%c", color, colors[charColor], ascii[charid]);
         }
         printf("\n%s%s", color, defaultColor);
@@ -288,6 +305,7 @@ void print(float buffer[WIDTH][HEIGHT][4])
 
 void clearBuffer(float buffer[WIDTH][HEIGHT][4])
 {
+#pragma omp parallel for
     for (int i = 0; i < WIDTH; i++)
     {
         for (int j = 0; j < HEIGHT; j++)
@@ -304,7 +322,7 @@ int main()
 {
     float buffer[WIDTH][HEIGHT][4];
     memset(buffer, 0, sizeof(buffer));
-    // attachFragmentShader(&customFragmentShader);
+
     for (int t = 0; t < FRAMES; t++)
     {
         from_obj(buffer, t);
