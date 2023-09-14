@@ -3,6 +3,7 @@
 #endif
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 char *ascii = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
 int asciiLen = 92;
@@ -105,23 +106,26 @@ void print_color(float buffer[WIDTH][HEIGHT][4])
             termColorBuffer[i][j][1] = charid;
         }
     }
+    char lineBuffer[4096] = "";
     for (int j = 0; j < HEIGHT; j++)
     {
+        lineBuffer[0] = 0;
         for (int i = 0; i < WIDTH; i++)
         {
             int charColor = termColorBuffer[i][j][0];
             int charid = termColorBuffer[i][j][1];
-            // TODO: use string concatenation to avoid spamming stdout
-            printf("%s%s%c", color, colors[charColor], ascii[charid]);
+            sprintf(lineBuffer + strlen(lineBuffer), "%s%s%c", color, colors[charColor], ascii[charid]);
         }
-        printf("\n%s%s", color, defaultColor);
+        printf("%s\n%s%s", lineBuffer, color, defaultColor);
     }
 }
 
 void print_grayscale(float buffer[WIDTH][HEIGHT][4])
 {
+    char lineBuffer[4096] = "";
     for (int j = 0; j < HEIGHT; j++)
     {
+        lineBuffer[0] = 0;
         for (int i = 0; i < WIDTH; i++)
         {
             float db = bayer(i, j, 4);
@@ -142,8 +146,8 @@ void print_grayscale(float buffer[WIDTH][HEIGHT][4])
                 charid = asciiLen - 1;
             if (charid < 0)
                 charid = 0;
-            printf("%c", ascii[charid]);
+            sprintf(lineBuffer + strlen(lineBuffer), "%c", ascii[charid]);
         }
-        printf("\n%s%s", color, defaultColor);
+        printf("%s\n%s%s", lineBuffer, color, defaultColor);
     }
 }
