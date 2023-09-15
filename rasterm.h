@@ -80,9 +80,9 @@ void triangle2D(float buffer[WIDTH][HEIGHT][4], Vector2D a, Vector2D b, Vector2D
 /* Converts points in model space to points in world space */
 Vector3D getWorldPos(Vector3D modelPos, ModelTransform transform);
 /* Converts points in world space to points in view space */
-Vector3D getViewPos(Vector3D wolrdPos, Camera cam);
+Vector3D getViewPos(Vector3D worldPos, Camera cam);
 /* Converts vectors in world space to vectors in view space */
-Vector3D getViewDir(Vector3D wolrdDir, Camera cam);
+Vector3D getViewDir(Vector3D worldDir, Camera cam);
 /* Returns a vector normal to the surface passing through the 3 points a b and c */
 Vector3D getNormal(Vector3D a, Vector3D b, Vector3D c);
 /* Converts from view space to screen space (x, y, inverse depth) */
@@ -248,46 +248,46 @@ Vector3D getWorldPos(Vector3D modelPos, ModelTransform transform)
     return ret;
 }
 
-Vector3D getViewPos(Vector3D wolrdPos, Camera cam)
+Vector3D getViewPos(Vector3D worldPos, Camera cam)
 {
-    wolrdPos.x -= cam.position.x;
-    wolrdPos.y -= cam.position.y;
-    wolrdPos.z -= cam.position.z;
+    worldPos.x -= cam.position.x;
+    worldPos.y -= cam.position.y;
+    worldPos.z -= cam.position.z;
 
     float rotXZ = cam.rotXZ;
     float rotYZ = cam.rotYZ;
 
-    Vector2D xz = {wolrdPos.x, wolrdPos.z};
-    wolrdPos.x = cosf(rotXZ) * xz.x + sinf(rotXZ) * xz.y;
-    wolrdPos.z = -sinf(rotXZ) * xz.x + cosf(rotXZ) * xz.y;
+    Vector2D xz = {worldPos.x, worldPos.z};
+    worldPos.x = cosf(rotXZ) * xz.x + sinf(rotXZ) * xz.y;
+    worldPos.z = -sinf(rotXZ) * xz.x + cosf(rotXZ) * xz.y;
 
-    Vector2D yz = {wolrdPos.y, wolrdPos.z};
-    wolrdPos.y = cosf(rotYZ) * yz.x + sinf(rotYZ) * yz.y;
-    wolrdPos.z = -sinf(rotYZ) * yz.x + cosf(rotYZ) * yz.y;
+    Vector2D yz = {worldPos.y, worldPos.z};
+    worldPos.y = cosf(rotYZ) * yz.x + sinf(rotYZ) * yz.y;
+    worldPos.z = -sinf(rotYZ) * yz.x + cosf(rotYZ) * yz.y;
 
-    Vector3D ret = {wolrdPos.x,
-                    wolrdPos.y,
-                    wolrdPos.z};
+    Vector3D ret = {worldPos.x,
+                    worldPos.y,
+                    worldPos.z};
     return ret;
 }
 
-Vector3D getViewDir(Vector3D wolrdDir, Camera cam)
+Vector3D getViewDir(Vector3D worldDir, Camera cam)
 {
 
     float rotXZ = cam.rotXZ;
     float rotYZ = cam.rotYZ;
 
-    Vector2D xz = {wolrdDir.x, wolrdDir.z};
-    wolrdDir.x = cosf(rotXZ) * xz.x + sinf(rotXZ) * xz.y;
-    wolrdDir.z = -sinf(rotXZ) * xz.x + cosf(rotXZ) * xz.y;
+    Vector2D xz = {worldDir.x, worldDir.z};
+    worldDir.x = cosf(rotXZ) * xz.x + sinf(rotXZ) * xz.y;
+    worldDir.z = -sinf(rotXZ) * xz.x + cosf(rotXZ) * xz.y;
 
-    Vector2D yz = {wolrdDir.y, wolrdDir.z};
-    wolrdDir.y = cosf(rotYZ) * yz.x + sinf(rotYZ) * yz.y;
-    wolrdDir.z = -sinf(rotYZ) * yz.x + cosf(rotYZ) * yz.y;
+    Vector2D yz = {worldDir.y, worldDir.z};
+    worldDir.y = cosf(rotYZ) * yz.x + sinf(rotYZ) * yz.y;
+    worldDir.z = -sinf(rotYZ) * yz.x + cosf(rotYZ) * yz.y;
 
-    return (Vector3D){wolrdDir.x,
-                      wolrdDir.y,
-                      wolrdDir.z};
+    return (Vector3D){worldDir.x,
+                      worldDir.y,
+                      worldDir.z};
 }
 
 Vector3D getNormal(Vector3D a, Vector3D b, Vector3D c)
