@@ -10,6 +10,10 @@ int asciiLen = 92;
 
 char *color = "\033";
 
+char *full_color = "[1;48;2";
+char *full_color256 = "[1;48;5";
+
+
 const char *colors[8] = {"[1;30m", "[1;31m", "[1;32m", "[1;33m", "[1;34m", "[1;35m", "[1;36m", "[1;37m"};
 const char *bgcolors[8] = {"[1;40m", "[1;41m", "[1;42m", "[1;43m", "[1;44m", "[1;45m", "[1;46m", "[1;47m"};
 const int black = 0;
@@ -149,5 +153,36 @@ void print_grayscale(float buffer[WIDTH][HEIGHT][4])
             sprintf(lineBuffer + strlen(lineBuffer), "%c", ascii[charid]);
         }
         printf("%s\n%s%s", lineBuffer, color, defaultColor);
+    }
+}
+
+void print_fc(float buffer[WIDTH][HEIGHT][4])
+{
+    char lineBuffer[4096] = "";
+    for (int j = 0; j < HEIGHT; j++)
+    {
+        lineBuffer[0] = 0;
+        for (int i = 0; i < WIDTH; i++)
+        {
+            float db = bayer(i, j, 4);
+            float dr = bayer(i, j, 5);
+            float dg = bayer(i, j, 6);
+
+            float r = buffer[i][j][0];
+            r = r < 0. ? 0. : sqrtf(r);
+            r = r > 1. ? 1. : r;
+            float g = buffer[i][j][1];
+            g = g < 0. ? 0. : sqrtf(g);
+            g = g > 1. ? 1. : g;
+            float b = buffer[i][j][2];
+            b = b < 0. ? 0. : sqrtf(b);
+            b = b > 1. ? 1. : b;
+
+            int c256 = ((int)(r * 6) * 36) + (int)(g * 6) * 6 + (int)(b * 6);
+
+            // printf("%s%s%u;%u;%um+", color, full_color, (int)(g * 255), (int)(g * 255), (int)(b * 255));
+            sprintf(lineBuffer + strlen(lineBuffer), "%s%s;%um ", color, full_color256, c256);
+        }
+        printf("\n%s%s", color, defaultColor);
     }
 }
