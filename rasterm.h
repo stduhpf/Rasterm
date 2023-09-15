@@ -63,23 +63,35 @@ typedef void (*FragmentShader)(float bufferColor[4], int x, int y, Vector2D uv, 
 
 float min4(float a, float b, float c, float d);
 float max4(float a, float b, float c, float d);
+/* 2D outer product */
 float get_det(Vector2D a, Vector2D b);
 float dot2(Vector2D a, Vector2D b);
 float dot(Vector3D a, Vector3D b);
 Vector3D cross(Vector3D a, Vector3D b);
+/* Returns a scaled copy of vector a with euclidean length = 1 */
 Vector3D normalize(Vector3D a);
+/* Get barycentric coordinates of point p in triangle abc (c being the "origin" of the barycentric coordinates) */
 Vector2D barycentric(Vector2D p, Vector2D a, Vector2D b, Vector2D c);
+/* Called during rasterization to check wether some pixel is actually part of the triangle, and if it passes the depth check.
+ Also calls the currently enabled fragment shader to each pixel that passes the test  */
 void triangleShader(float bufferColor[4], int x, int y, Vector2D uv, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene);
+/* Rasterize 2D triangle abc onto the frame buffer, performing depth culling with the inverse z values of each vertex */
 void triangle2D(float buffer[WIDTH][HEIGHT][4], Vector2D a, Vector2D b, Vector2D c, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene);
 /* Converts points in model space to points in world space */
 Vector3D getWorldPos(Vector3D modelPos, ModelTransform transform);
 /* Converts points in world space to points in view space */
 Vector3D getViewPos(Vector3D wolrdPos, Camera cam);
+/* Converts vectors in world space to vectors in view space */
 Vector3D getViewDir(Vector3D wolrdDir, Camera cam);
+/* Returns a vector normal to the surface passing through the 3 points a b and c */
 Vector3D getNormal(Vector3D a, Vector3D b, Vector3D c);
+/* Converts from view space to screen space (x, y, inverse depth) */
 Vector3D project(Vector3D p, const float screenZ);
+/* Project and rasterize the 3D triangle ABC in the scene onto the frame buffer */
 void triangle3D(float buffer[WIDTH][HEIGHT][4], Vector3D A, Vector3D B, Vector3D C, Vector3D color, SceneAttributes scene);
+/* Set the "fragment shader" that will be used during the next call to triangleShader() during rasterization */
 void attachFragmentShader(FragmentShader fs);
+/* Reset the fragment shader to the default flat lambert shading */
 void resetFragmentShader();
 
 #ifdef RASTERM_IMPLEMENTATION
