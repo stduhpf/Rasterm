@@ -3,7 +3,7 @@
 
 #include <omp.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <windows.h>
 
 void usleep(__int64 usec)
@@ -27,9 +27,8 @@ void usleep(__int64 usec)
 #include "cup.h"
 
 #ifndef PX_ASPECT
-#define PX_ASPECT 2.25
+#define PX_ASPECT 2.22
 #endif
-
 
 #ifndef ASPECT_RATIO
 #define ASPECT_RATIO 1
@@ -39,7 +38,7 @@ void usleep(__int64 usec)
 #define HEIGHT 64
 #endif
 #ifndef WIDTH
-#define WIDTH ((int)(HEIGHT * PX_ASPECT* ASPECT_RATIO))
+#define WIDTH ((int)(HEIGHT * PX_ASPECT * ASPECT_RATIO))
 #endif
 
 #define PERSPECTIVE_UV // enable perspective texture mapping
@@ -81,20 +80,21 @@ void from_obj(float buffer[WIDTH][HEIGHT][4], int t)
     SceneAttributes scene = {lightVec, (Vector3D){.999, .999, .995}, (Vector3D){.005, .005, .01}, camera};
 
     // #pragma omp parallel for
+    ModelTransform potTransform = {(Vector3D){-1, 2, 0},
+                                   0.1,
+                                   0.0,
+                                   0.4,
+                                   (Vector3D){-1, -1, -1}};
     for (int f = 0; f < faces_count_pot; f++)
     {
-        const float rotateXY = 0.4;
-        const float rotateXZ = 0.0;
-        const float rotateYZ = 0.1;
-        const Vector3D worldOffset = {-1, 2, 0};
 
         Vector3D A = (Vector3D){vertices_pot[faces_pot[f][0]][0], vertices_pot[faces_pot[f][0]][1], vertices_pot[faces_pot[f][0]][2]};
         Vector3D B = (Vector3D){vertices_pot[faces_pot[f][1]][0], vertices_pot[faces_pot[f][1]][1], vertices_pot[faces_pot[f][1]][2]};
         Vector3D C = (Vector3D){vertices_pot[faces_pot[f][2]][0], vertices_pot[faces_pot[f][2]][1], vertices_pot[faces_pot[f][2]][2]};
 
-        A = getWorldPos(A, worldOffset, rotateXY, rotateXZ, rotateYZ);
-        B = getWorldPos(B, worldOffset, rotateXY, rotateXZ, rotateYZ);
-        C = getWorldPos(C, worldOffset, rotateXY, rotateXZ, rotateYZ);
+        A = getWorldPos(A, potTransform);
+        B = getWorldPos(B, potTransform);
+        C = getWorldPos(C, potTransform);
 
         triangle3D(buffer, A, B, C, (Vector3D){1, .5, .5}, scene);
 
@@ -104,22 +104,22 @@ void from_obj(float buffer[WIDTH][HEIGHT][4], int t)
         print(buffer);
 #endif
     }
-
+    ModelTransform cupTransform = {(Vector3D){2, .5, 0},
+                                   0.0,
+                                   0.5,
+                                   0.0,
+                                   (Vector3D){-1, -1, -1}};
     for (int f = 0; f < faces_count_cup; f++)
     {
-        const float rotateXZ = 0.5;
-        const float rotateYZ = 0;
-        const float rotateXY = 0;
-        const Vector3D worldOffset = {2, .5, 0};
 
         // normals are broken because of inconsistent vertex order
         Vector3D A = (Vector3D){vertices_cup[faces_cup[f][0]][0], vertices_cup[faces_cup[f][0]][1], vertices_cup[faces_cup[f][0]][2]};
         Vector3D B = (Vector3D){vertices_cup[faces_cup[f][1]][0], vertices_cup[faces_cup[f][1]][1], vertices_cup[faces_cup[f][1]][2]};
         Vector3D C = (Vector3D){vertices_cup[faces_cup[f][2]][0], vertices_cup[faces_cup[f][2]][1], vertices_cup[faces_cup[f][2]][2]};
 
-        A = getWorldPos(A, worldOffset, rotateXY, rotateXZ, rotateYZ);
-        B = getWorldPos(B, worldOffset, rotateXY, rotateXZ, rotateYZ);
-        C = getWorldPos(C, worldOffset, rotateXY, rotateXZ, rotateYZ);
+        A = getWorldPos(A, cupTransform);
+        B = getWorldPos(B, cupTransform);
+        C = getWorldPos(C, cupTransform);
 
         triangle3D(buffer, A, B, C, (Vector3D){1, 1, 1}, scene);
 
@@ -152,6 +152,7 @@ void from_obj(float buffer[WIDTH][HEIGHT][4], int t)
 
 #define GRAYSCALE 0
 #define COLOR 1
+#define FULL_COLOR 1
 
 #ifndef RENDER_TARGET
 #define RENDER_TARGET GRAYSCALE
@@ -161,8 +162,10 @@ void print(float buffer[WIDTH][HEIGHT][4])
 {
 #if RENDER_TARGET == GRAYSCALE
     print_grayscale(buffer);
-#else
+#elif RENDER_TARGET == COLOR
     print_color(buffer);
+#else
+    print_fc(buffer);
 #endif
 }
 

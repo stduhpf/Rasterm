@@ -47,6 +47,15 @@ typedef struct
     Camera camera;
 } SceneAttributes;
 
+typedef struct
+{
+    Vector3D origin;
+    float rotYZ;
+    float rotXZ;
+    float rotXY;
+    Vector3D scale;
+} ModelTransform;
+
 typedef void (*FragmentShader)(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene);
 
 #define MIN(a, b) (a < b ? a : b)
@@ -62,7 +71,9 @@ Vector3D normalize(Vector3D a);
 Vector2D barycentric(Vector2D p, Vector2D a, Vector2D b, Vector2D c);
 void triangleShader(float bufferColor[4], int x, int y, Vector2D uv, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene);
 void triangle2D(float buffer[WIDTH][HEIGHT][4], Vector2D a, Vector2D b, Vector2D c, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene);
-Vector3D getWorldPos(Vector3D modelPos, Vector3D origin, float rotXY, float rotXZ, float rotYZ);
+/* Converts points in model space to points in world space */
+Vector3D getWorldPos(Vector3D modelPos, ModelTransform transform);
+/* Converts points in world space to points in view space */
 Vector3D getViewPos(Vector3D wolrdPos, Camera cam);
 Vector3D getViewDir(Vector3D wolrdDir, Camera cam);
 Vector3D getNormal(Vector3D a, Vector3D b, Vector3D c);
@@ -201,27 +212,27 @@ void triangle2D(float buffer[WIDTH][HEIGHT][4], Vector2D a, Vector2D b, Vector2D
     }
 }
 
-Vector3D getWorldPos(Vector3D modelPos, Vector3D origin, float rotXY, float rotXZ, float rotYZ)
+Vector3D getWorldPos(Vector3D modelPos, ModelTransform transform)
 {
-    modelPos.x = -modelPos.x;
-    modelPos.y = -modelPos.y;
-    modelPos.z = -modelPos.z;
+    modelPos.x = modelPos.x * transform.scale.x;
+    modelPos.y = modelPos.y * transform.scale.y;
+    modelPos.z = modelPos.z * transform.scale.z;
 
     Vector2D xy = {modelPos.x, modelPos.y};
-    modelPos.x = cosf(rotXY) * xy.x + sinf(rotXY) * xy.y;
-    modelPos.y = -sinf(rotXY) * xy.x + cosf(rotXY) * xy.y;
+    modelPos.x = cosf(transform.rotXY) * xy.x + sinf(transform.rotXY) * xy.y;
+    modelPos.y = -sinf(transform.rotXY) * xy.x + cosf(transform.rotXY) * xy.y;
 
     Vector2D xz = {modelPos.x, modelPos.z};
-    modelPos.x = cosf(rotXZ) * xz.x + sinf(rotXZ) * xz.y;
-    modelPos.z = -sinf(rotXZ) * xz.x + cosf(rotXZ) * xz.y;
+    modelPos.x = cosf(transform.rotXZ) * xz.x + sinf(transform.rotXZ) * xz.y;
+    modelPos.z = -sinf(transform.rotXZ) * xz.x + cosf(transform.rotXZ) * xz.y;
 
     Vector2D yz = {modelPos.y, modelPos.z};
-    modelPos.y = cosf(rotYZ) * yz.x + sinf(rotYZ) * yz.y;
-    modelPos.z = -sinf(rotYZ) * yz.x + cosf(rotYZ) * yz.y;
+    modelPos.y = cosf(transform.rotYZ) * yz.x + sinf(transform.rotYZ) * yz.y;
+    modelPos.z = -sinf(transform.rotYZ) * yz.x + cosf(transform.rotYZ) * yz.y;
 
-    Vector3D ret = {modelPos.x - origin.x,
-                    modelPos.y - origin.y,
-                    modelPos.z - origin.z};
+    Vector3D ret = {modelPos.x - transform.origin.x,
+                    modelPos.y - transform.origin.y,
+                    modelPos.z - transform.origin.z};
     return ret;
 }
 
