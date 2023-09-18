@@ -70,6 +70,7 @@ float dot(Vector3D a, Vector3D b);
 Vector3D cross(Vector3D a, Vector3D b);
 /* Returns a scaled copy of vector a with euclidean length = 1 */
 Vector3D normalize(Vector3D a);
+
 /* Get barycentric coordinates of point p in triangle abc (c being the "origin" of the barycentric coordinates) */
 Vector2D barycentric(Vector2D p, Vector2D a, Vector2D b, Vector2D c);
 /* Called during rasterization to check wether some pixel is actually part of the triangle, and if it passes the depth check.
@@ -96,9 +97,9 @@ void resetFragmentShader();
 
 #ifdef RASTERM_IMPLEMENTATION
 
+/* default shader: simple lambertian diffuse with solid color */
 static void defaultFragmentShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
 {
-    // default shader: simple lambertian diffuse with solid color
     float illumination = 1.;
     if (dot(attribs.normal, attribs.normal) > 0.)
     {
@@ -156,12 +157,38 @@ Vector3D cross(Vector3D a, Vector3D b)
     return ret;
 }
 
+#ifdef FAST_MATH
+float Q_rsqrt(float number)
+{
+    long i;
+    float x2, y;
+    const float threeHalves = 1.5F;
+
+    x2 = number * 0.5F;
+    y = number;
+    i = *(long *)&y;           // evil floating point bit level hacking
+    i = 0x5f3759df - (i >> 1); // what the fuck?
+    y = *(float *)&i;
+    y = y * (threeHalves - (x2 * y * y)); // 1st iteration
+                                          // y  = y * ( threeHalves - ( x2 * y * y ) );   // 2nd iteration, this can be removed
+
+    return y;
+}
+#endif
+
 Vector3D normalize(Vector3D a)
 {
+#ifdef FAST_MATH
+    float il = Q_rsqrt(dot(a, a));
+    a.x *= il;
+    a.y *= il;
+    a.z *= il;
+#else
     float l = sqrtf(dot(a, a));
     a.x /= l;
     a.y /= l;
     a.z /= l;
+#endif
     return a;
 }
 
@@ -336,5 +363,5 @@ void triangle3D(float buffer[WIDTH][HEIGHT][4], Vector3D A, Vector3D B, Vector3D
     triangle2D(buffer, a, b, c, Ap.z, Bp.z, Cp.z, attribs, scene);
 }
 
-#endif
-#endif
+#endif // RASTERM_IMPLEMENTATION
+#endif // RASTERM
