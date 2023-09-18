@@ -13,7 +13,6 @@ char *color = "\033";
 char *full_color = "[1;48;2";
 char *full_color256 = "[1;48;5";
 
-
 const char *colors[8] = {"[1;30m", "[1;31m", "[1;32m", "[1;33m", "[1;34m", "[1;35m", "[1;36m", "[1;37m"};
 const char *bgcolors[8] = {"[1;40m", "[1;41m", "[1;42m", "[1;43m", "[1;44m", "[1;45m", "[1;46m", "[1;47m"};
 const int black = 0;
@@ -30,6 +29,8 @@ char *defaultColor = "[0m";
 float lumaR = 0.2126;
 float lumaG = 0.7152;
 float lumaB = 0.0722;
+
+#define BUFFER_LENGTH 2048
 
 float bayer(int x, int y, int level)
 {
@@ -110,7 +111,7 @@ void print_color(float buffer[WIDTH][HEIGHT][4])
             termColorBuffer[i][j][1] = charid;
         }
     }
-    char lineBuffer[4096] = "";
+    char lineBuffer[BUFFER_LENGTH] = "";
     for (int j = 0; j < HEIGHT; j++)
     {
         lineBuffer[0] = 0;
@@ -118,15 +119,22 @@ void print_color(float buffer[WIDTH][HEIGHT][4])
         {
             int charColor = termColorBuffer[i][j][0];
             int charid = termColorBuffer[i][j][1];
-            sprintf(lineBuffer + strlen(lineBuffer), "%s%s%c", color, colors[charColor], ascii[charid]);
+            int s = strlen(lineBuffer);
+            if (s + 16 >= BUFFER_LENGTH)
+            {
+                printf("%s", lineBuffer);
+                s = 0;
+                lineBuffer[0] = 0;
+            }
+            sprintf(lineBuffer + s, "%s%s%c", color, colors[charColor], ascii[charid]);
         }
-        printf("%s\n%s%s", lineBuffer, color, defaultColor);
+        printf("%s%s%s\n", lineBuffer, color, defaultColor);
     }
 }
 
 void print_grayscale(float buffer[WIDTH][HEIGHT][4])
 {
-    char lineBuffer[4096] = "";
+    char lineBuffer[BUFFER_LENGTH] = "";
     for (int j = 0; j < HEIGHT; j++)
     {
         lineBuffer[0] = 0;
@@ -150,7 +158,16 @@ void print_grayscale(float buffer[WIDTH][HEIGHT][4])
                 charid = asciiLen - 1;
             if (charid < 0)
                 charid = 0;
-            sprintf(lineBuffer + strlen(lineBuffer), "%c", ascii[charid]);
+            int s = strlen(lineBuffer);
+
+            if (s + 16 >= BUFFER_LENGTH)
+            {
+                printf("%s", lineBuffer);
+                s = 0;
+                lineBuffer[0] = 0;
+            }
+
+            sprintf(lineBuffer + s, "%c", ascii[charid]);
         }
         printf("%s\n%s%s", lineBuffer, color, defaultColor);
     }
@@ -158,7 +175,7 @@ void print_grayscale(float buffer[WIDTH][HEIGHT][4])
 
 void print_fc(float buffer[WIDTH][HEIGHT][4])
 {
-    char lineBuffer[4096] = "";
+    char lineBuffer[BUFFER_LENGTH] = "";
     for (int j = 0; j < HEIGHT; j++)
     {
         lineBuffer[0] = 0;
@@ -178,11 +195,20 @@ void print_fc(float buffer[WIDTH][HEIGHT][4])
             b = b < 0. ? 0. : sqrtf(b);
             b = b > 1. ? 1. : b;
 
-            int c256 = ((int)(r * 6) * 36) + (int)(g * 6) * 6 + (int)(b * 6);
+            int c256 = 16 + ((int)(r * 6) * 36) + (int)(g * 6) * 6 + (int)(b * 6);
 
-            // printf("%s%s%u;%u;%um+", color, full_color, (int)(g * 255), (int)(g * 255), (int)(b * 255));
-            sprintf(lineBuffer + strlen(lineBuffer), "%s%s;%um ", color, full_color256, c256);
+            int s = strlen(lineBuffer);
+
+            if (s + 16 >= BUFFER_LENGTH)
+            {
+                printf("%s", lineBuffer);
+                s = 0;
+                lineBuffer[0] = 0;
+            }
+
+            // sprintf(lineBuffer + s,"%s%s%u;%u;%um ", color, full_color, (int)(g * 255), (int)(g * 255), (int)(b * 255));
+            sprintf(lineBuffer + s, "%s%s;%um ", color, full_color256, c256);
         }
-        printf("\n%s%s", color, defaultColor);
+        printf("%s%s%s\n", lineBuffer, color, defaultColor);
     }
 }
