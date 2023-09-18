@@ -27,7 +27,7 @@ void usleep(__int64 usec)
 #include "cup.h"
 
 #ifndef PX_ASPECT
-#define PX_ASPECT 2.22
+#define PX_ASPECT 2.21
 #endif
 
 #ifndef ASPECT_RATIO
@@ -152,7 +152,7 @@ void from_obj(float buffer[WIDTH][HEIGHT][4], int t)
 
 #define GRAYSCALE 0
 #define COLOR 1
-#define FULL_COLOR 1
+#define FULL_COLOR 2
 
 #ifndef RENDER_TARGET
 #define RENDER_TARGET GRAYSCALE
