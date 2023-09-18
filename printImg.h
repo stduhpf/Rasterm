@@ -195,6 +195,8 @@ void print_fc(float buffer[WIDTH][HEIGHT][4])
             b = b < 0. ? 0. : sqrtf(b);
             b = b > 1. ? 1. : b;
 
+            // TODO: 3D dithering?
+
             int c256 = 16 + ((int)(r * 6) * 36) + (int)(g * 6) * 6 + (int)(b * 6);
 
             int s = strlen(lineBuffer);
