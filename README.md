@@ -7,11 +7,11 @@ I got the idea to do such a project from [olive.c](https://github.com/tsoding/ol
 
 ## Requirements:
 
-Only a standard C compiler.
+Only a standard C compiler, and either Windows or a POSIX-compliant operating system.
 
 ## Output:
 
-It produces images like this:
+By default, it produces images like this:
 
 ```
                                         p
@@ -35,10 +35,54 @@ It produces images like this:
           RRHH
 
 ```
-## Optionnal flags
 
-- `-DFRAMES=[n]`                     : Draws n consecutive animated frames (recommended) (default: 1)
-- `-DRENDER_TARGET=[GRAYSCALE|COLOR]`: Change output mode (default: GRAYSCALE)
-- `-DSTEP_RENDER`                    : Refreshes the display after each triangle drawn on canvas (looks cool, but is very slow)
-- `-DHEIGHT=[int]`                   : change size of canvas (default value:64)
-- `-DASPECT=[float]`                 : to adapt to the "aspect ratio" of the font used in terminal (default 2.25)  (controls the width indirectly)
+## Usefull macros
+
+### Graphics engine: (rasterm.h)
+
+- `HEIGHT=[int]` : change size of canvas (default value:64)
+- `PX_ASPECT=[float]` : to adapt to the "aspect ratio" of the display's pixels (default 2.21 for terminal font) (controls the width indirectly)
+- `ASPECT_RATIO=[float]` : changes the aspect ratio of the render (controls the width indirectly)
+- `WIDTH=[int]`: I advise not using this one, you should rather use `ASPECT_RATIO="(float)[int]/HEIGHT"`, or you will have to deal with the pixel aspect ratio too
+- `FAST_MATH`: use fast inverse square root algorithm (might not be actually faster on modern hardware)
+- `PERSPECTIVE_UV` enables perspective-corrected uv mapping on 3D triangles (enabled by default in main.c)
+
+### Renderer: (main.c)
+
+- `FRAMES=[n]` : Draws n consecutive animated frames (recommended) (default: 1)
+- `RENDER_TARGET=[GRAYSCALE|COLOR|FULL_COLOR]`: Change output mode (default: GRAYSCALE)
+- `STEP_RENDER` : Refreshes the display after each triangle drawn on canvas (looks cool, but is very slow)
+
+### Display lib: (printImg.h)
+
+- `DITHER` : enables dithering for full color terminal rendering
+
+## Build procedure:
+
+To compile with de default config, you only need to link with libmath:
+
+```sh
+[your c compiler] -o threed main.c -lm
+./threed
+```
+
+If you want to change the settings, if your compiler supports it, you could define the config macros with compilation flags.
+For example for a sequence of 500 dithered full color "high resolution" 16/9 images, you can try:
+
+```sh
+[your c compiler] -o threed main.c -lm -DHEIGHT=128 -DASPECT_RATIO="16./9." -DFRAMES=500 -DRENDER_TARGET=FULL_COLOR -DDITHER
+./threed
+```
+
+## Architecture:
+
+The code is split in 3 parts:
+
+- **The renderer**: located in `main.c`
+- **The graphics engine** : located in `rasterm.h`. It is the core of this project.
+- **The terminal output library**: located in `printImg.h`. It is in charge of displaying the rendered images to the terminal.
+
+### rasterm.h
+
+This is the important file of this repo.
+It is a STB-style library that contains the necessary tools for rasterizing and shading 3D triangles to a 2D buffer.
