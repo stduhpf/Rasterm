@@ -173,32 +173,88 @@ void print_grayscale(float buffer[WIDTH][HEIGHT][4])
     }
 }
 
+// #define DITHER
+#define LINEAR_DITHER
+
 void print_fc(float buffer[WIDTH][HEIGHT][4])
 {
+    int fullColorBuffer[WIDTH][HEIGHT];
+    for (int j = 0; j < HEIGHT; j++)
+    {
+        for (int i = 0; i < WIDTH; i++)
+        {
+            float dr = bayer(i, j, 5);
+            float dg = bayer(i, j, 6);
+            float db = bayer(i, j, 4);
+
+            float r = buffer[i][j][0];
+            r = r < 0. ? 0. : r;
+            r = r > 1. ? 1. : r;
+            float g = buffer[i][j][1];
+            g = g < 0. ? 0. : g;
+            g = g > 1. ? 1. : g;
+            float b = buffer[i][j][2];
+            b = b < 0. ? 0. : b;
+            b = b > 1. ? 1. : b;
+
+#ifdef DITHER
+
+#ifdef LINEAR_DITHER
+            float R = sqrtf(r);
+            float G = sqrtf(g);
+            float B = sqrtf(b);
+
+            R = (int)(R * 6) / 6.0f;
+            G = (int)(G * 6) / 6.0f;
+            B = (int)(B * 6) / 6.0f;
+
+            float r0 = (int)R * (int)R;
+            float r1 = r0 + 2 * (int)R + 1;
+
+            float g0 = (int)G * (int)G;
+            float g1 = g0 + 2 * (int)G + 1;
+
+            float b0 = (int)B * (int)B;
+            float b1 = b0 + 2 * (int)B + 1;
+
+            float rf = (r - r0) / (r1 - r0);
+            float gf = (g - g0) / (g1 - g0);
+            float bf = (b - b0) / (b1 - b0);
+#else
+
+            r = sqrtf(r) * 6;
+            g = sqrtf(g) * 6;
+            b = sqrtf(b) * 6;
+
+            float R = (int)(r) / 6.0f;
+            float G = (int)(g) / 6.0f;
+            float B = (int)(b) / 6.0f;
+
+            float rf = r / 6.0f - R;
+            float gf = g / 6.0f - G;
+            float bf = b / 6.0f - B;
+#endif // LINEAR_DITHER
+
+            r = R + (int)(rf > dr) / 6.0f;
+            g = G + (int)(gf > dg) / 6.0f;
+            b = B + (int)(bf > db) / 6.0f;
+#else
+            r = sqrtf(r);
+            g = sqrtf(g);
+            b = sqrtf(b);
+#endif // DITHER
+
+            int c256 = 16 + ((int)(r * 6) * 36) + (int)(g * 6) * 6 + (int)(b * 6);
+            fullColorBuffer[i][j] = c256;
+        }
+    }
     char lineBuffer[BUFFER_LENGTH] = "";
     for (int j = 0; j < HEIGHT; j++)
     {
         lineBuffer[0] = 0;
         for (int i = 0; i < WIDTH; i++)
         {
-            float db = bayer(i, j, 4);
-            float dr = bayer(i, j, 5);
-            float dg = bayer(i, j, 6);
-
-            float r = buffer[i][j][0];
-            r = r < 0. ? 0. : sqrtf(r);
-            r = r > 1. ? 1. : r;
-            float g = buffer[i][j][1];
-            g = g < 0. ? 0. : sqrtf(g);
-            g = g > 1. ? 1. : g;
-            float b = buffer[i][j][2];
-            b = b < 0. ? 0. : sqrtf(b);
-            b = b > 1. ? 1. : b;
-
-            // TODO: 3D dithering?
-
-            int c256 = 16 + ((int)(r * 6) * 36) + (int)(g * 6) * 6 + (int)(b * 6);
-
+            int c256 = fullColorBuffer[i][j];
             int s = strlen(lineBuffer);
 
             if (s + 16 >= BUFFER_LENGTH)
