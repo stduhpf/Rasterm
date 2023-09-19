@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 
-#include <omp.h>
+// #include <omp.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -171,7 +171,7 @@ void print(float buffer[WIDTH][HEIGHT][4])
 
 void clearBuffer(float buffer[WIDTH][HEIGHT][4])
 {
-#pragma omp parallel for
+// #pragma omp parallel for
     for (int i = 0; i < WIDTH; i++)
     {
         for (int j = 0; j < HEIGHT; j++)
