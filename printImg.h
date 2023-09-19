@@ -183,10 +183,6 @@ void print_fc(float buffer[WIDTH][HEIGHT][4])
     {
         for (int i = 0; i < WIDTH; i++)
         {
-            float dr = bayer(i, j, 5);
-            float dg = bayer(i, j, 6);
-            float db = bayer(i, j, 4);
-
             float r = buffer[i][j][0];
             r = r < 0. ? 0. : r;
             r = r > 1. ? 1. : r;
@@ -198,6 +194,9 @@ void print_fc(float buffer[WIDTH][HEIGHT][4])
             b = b > 1. ? 1. : b;
 
 #ifdef DITHER
+            float dr = bayer(i, j, 5);
+            float dg = bayer(i, j, 6);
+            float db = bayer(i, j, 4);
 
 #ifdef LINEAR_DITHER
             float R = sqrtf(r);
