@@ -1,13 +1,6 @@
 #ifndef RASTERM
 #define RASTERM
 
-#ifndef HEIGHT
-#define HEIGHT 64
-#endif
-#ifndef WIDTH
-#define WIDTH 64
-#endif
-
 #ifndef ASPECT_RATIO
 #define ASPECT_RATIO 1
 #endif
@@ -244,14 +237,14 @@ void triangle2D(Framebuffer buffer, Vector2D a, Vector2D b, Vector2D c, float iz
     if (iza < 0. || izb < 0. || izc < 0.)
         return;
     // triangle AABB estimation
-    int xMin = (int)(MAX(min4(a.x, b.x, c.x, (float)(WIDTH - 1)), 0));
-    int xMax = (int)(MIN(max4(a.x, b.x, c.x, 0), (float)(WIDTH - 1)));
-    if (xMax < 0 || xMin >= WIDTH)
+    int xMin = (int)(MAX(min4(a.x, b.x, c.x, (float)(buffer.width - 1)), 0));
+    int xMax = (int)(MIN(max4(a.x, b.x, c.x, 0), (float)(buffer.width - 1)));
+    if (xMax < 0 || xMin >= buffer.width)
         return;
 
-    int yMin = (int)(MAX(min4(a.y, b.y, c.y, (float)(HEIGHT - 1)), 0));
-    int yMax = (int)(MIN(max4(a.y, b.y, c.y, 0), (float)(HEIGHT - 1)));
-    if (yMax < 0 || yMin >= HEIGHT)
+    int yMin = (int)(MAX(min4(a.y, b.y, c.y, (float)(buffer.height - 1)), 0));
+    int yMax = (int)(MIN(max4(a.y, b.y, c.y, 0), (float)(buffer.height - 1)));
+    if (yMax < 0 || yMin >= buffer.height)
         return;
 
     for (int x = xMin; x <= xMax; x++)
@@ -346,8 +339,8 @@ Vector3D project(Vector3D p, const float screenZ)
 {
     Vector3D ret = {0, 0, 0};
     p.z = p.z;
-    ret.x = (.5 + .5 * screenZ * p.x / p.z) * WIDTH;
-    ret.y = ((.5 + .5 * screenZ * p.y / p.z) * ASPECT_RATIO + (1.0f - ASPECT_RATIO) * .5) * HEIGHT;
+    ret.x = (.5 + .5 * screenZ * p.x / p.z);
+    ret.y = ((.5 + .5 * screenZ * p.y / p.z) * ASPECT_RATIO + (1.0f - ASPECT_RATIO) * .5);
     ret.z = screenZ / p.z;
     return ret;
 }
@@ -368,9 +361,9 @@ void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, Vector3D
     Vector3D Bp = project(B, scene.camera.focalLength);
     Vector3D Cp = project(C, scene.camera.focalLength);
 
-    Vector2D a = {Ap.x, Ap.y};
-    Vector2D b = {Bp.x, Bp.y};
-    Vector2D c = {Cp.x, Cp.y};
+    Vector2D a = {Ap.x*buffer.width, Ap.y*buffer.height};
+    Vector2D b = {Bp.x*buffer.width, Bp.y*buffer.height};
+    Vector2D c = {Cp.x*buffer.width, Cp.y*buffer.height};
 
     SurfaceAttributes attribs = {color, normal};
 
