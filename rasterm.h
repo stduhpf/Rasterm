@@ -14,6 +14,13 @@
 
 typedef struct
 {
+    float *data;
+    size_t width;
+    size_t height;
+} Framebuffer;
+
+typedef struct
+{
     float x;
     float y;
 } Vector2D;
@@ -61,6 +68,8 @@ typedef void (*FragmentShader)(float bufferColor[4], int x, int y, Vector2D uv, 
 #define MIN(a, b) (a < b ? a : b)
 #define MAX(a, b) (a > b ? a : b)
 
+float *framebufferAt(Framebuffer buffer, size_t i, size_t j);
+
 float min4(float a, float b, float c, float d);
 float max4(float a, float b, float c, float d);
 /* 2D outer product */
@@ -77,7 +86,7 @@ Vector2D barycentric(Vector2D p, Vector2D a, Vector2D b, Vector2D c);
  Also calls the currently enabled fragment shader to each pixel that passes the test  */
 void triangleShader(float bufferColor[4], int x, int y, Vector2D uv, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene);
 /* Rasterize 2D triangle abc onto the frame buffer, performing depth culling with the inverse z values of each vertex */
-void triangle2D(float buffer[WIDTH][HEIGHT][4], Vector2D a, Vector2D b, Vector2D c, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene);
+void triangle2D(Framebuffer buffer, Vector2D a, Vector2D b, Vector2D c, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene);
 /* Converts points in model space to points in world space */
 Vector3D getWorldPos(Vector3D modelPos, ModelTransform transform);
 /* Converts points in world space to points in view space */
@@ -89,7 +98,7 @@ Vector3D getNormal(Vector3D a, Vector3D b, Vector3D c);
 /* Converts from view space to screen space (x, y, inverse depth) */
 Vector3D project(Vector3D p, const float screenZ);
 /* Project and rasterize the 3D triangle ABC in the scene onto the frame buffer */
-void triangle3D(float buffer[WIDTH][HEIGHT][4], Vector3D A, Vector3D B, Vector3D C, Vector3D color, SceneAttributes scene);
+void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, Vector3D color, SceneAttributes scene);
 /* Set the "fragment shader" that will be used during the next call to triangleShader() during rasterization */
 void attachFragmentShader(FragmentShader fs);
 /* Reset the fragment shader to the default flat lambert shading */
@@ -122,6 +131,11 @@ void attachFragmentShader(FragmentShader fs)
 void resetFragmentShader()
 {
     fragmentShader = &defaultFragmentShader;
+}
+
+float *framebufferAt(Framebuffer buffer, size_t i, size_t j)
+{
+    return buffer.data + (i * buffer.height + j) * 4;
 }
 
 float min4(float a, float b, float c, float d)
@@ -225,7 +239,7 @@ void triangleShader(float bufferColor[4], int x, int y, Vector2D uv, float iza, 
     }
 }
 
-void triangle2D(float buffer[WIDTH][HEIGHT][4], Vector2D a, Vector2D b, Vector2D c, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene)
+void triangle2D(Framebuffer buffer, Vector2D a, Vector2D b, Vector2D c, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene)
 {
     if (iza < 0. || izb < 0. || izc < 0.)
         return;
@@ -246,7 +260,7 @@ void triangle2D(float buffer[WIDTH][HEIGHT][4], Vector2D a, Vector2D b, Vector2D
         {
             Vector2D p = {x, y};
             Vector2D uv = barycentric(p, a, b, c);
-            triangleShader(buffer[x][y], x, y, uv, iza, izb, izc, attribs, scene);
+            triangleShader(framebufferAt(buffer, x, y), x, y, uv, iza, izb, izc, attribs, scene);
         }
     }
 }
@@ -338,7 +352,7 @@ Vector3D project(Vector3D p, const float screenZ)
     return ret;
 }
 
-void triangle3D(float buffer[WIDTH][HEIGHT][4], Vector3D A, Vector3D B, Vector3D C, Vector3D color, SceneAttributes scene)
+void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, Vector3D color, SceneAttributes scene)
 {
     Vector3D normal = getNormal(A, B, C);
 

@@ -65,7 +65,7 @@ void chessboardShader(float bufferColor[4], int x, int y, Vector2D uv, float inv
 void print(float buffer[WIDTH][HEIGHT][4]);
 void from_obj(float buffer[WIDTH][HEIGHT][4], int t)
 {
-
+    Framebuffer fbuffer = {(float *)buffer, WIDTH, HEIGHT};
     const float cameraRotateSpeed = .01f;
     float cameraRotXZ = t * cameraRotateSpeed;
     float cameraRotYZ = -0.5;
@@ -96,7 +96,7 @@ void from_obj(float buffer[WIDTH][HEIGHT][4], int t)
         B = getWorldPos(B, potTransform);
         C = getWorldPos(C, potTransform);
 
-        triangle3D(buffer, A, B, C, (Vector3D){1, .5, .5}, scene);
+        triangle3D(fbuffer, A, B, C, (Vector3D){1, .5, .5}, scene);
 
 #ifdef STEP_RENDER
         printf("\033[%zuA", (size_t)HEIGHT);
@@ -121,7 +121,7 @@ void from_obj(float buffer[WIDTH][HEIGHT][4], int t)
         B = getWorldPos(B, cupTransform);
         C = getWorldPos(C, cupTransform);
 
-        triangle3D(buffer, A, B, C, (Vector3D){1, 1, 1}, scene);
+        triangle3D(fbuffer, A, B, C, (Vector3D){1, 1, 1}, scene);
 
 #ifdef STEP_RENDER
         printf("\033[%zuA", (size_t)HEIGHT);
@@ -135,14 +135,14 @@ void from_obj(float buffer[WIDTH][HEIGHT][4], int t)
         Vector3D A = (Vector3D){-4, 0, 4};
         Vector3D B = (Vector3D){4, 0, -4};
         Vector3D C = (Vector3D){-4, 0, -4};
-        triangle3D(buffer, A, B, C, (Vector3D){.6, .5, .1}, scene);
+        triangle3D(fbuffer, A, B, C, (Vector3D){.6, .5, .1}, scene);
 #ifdef STEP_RENDER
         printf("\033[%zuA", (size_t)HEIGHT);
         printf("\033[%zuD", (size_t)WIDTH);
         print(buffer);
 #endif
         C = (Vector3D){4, 0, 4};
-        triangle3D(buffer, A, B, C, (Vector3D){.6, .5, .1}, scene);
+        triangle3D(fbuffer, A, B, C, (Vector3D){.6, .5, .1}, scene);
         resetFragmentShader();
     }
 }
@@ -171,7 +171,7 @@ void print(float buffer[WIDTH][HEIGHT][4])
 
 void clearBuffer(float buffer[WIDTH][HEIGHT][4])
 {
-// #pragma omp parallel for
+    // #pragma omp parallel for
     for (int i = 0; i < WIDTH; i++)
     {
         for (int j = 0; j < HEIGHT; j++)
@@ -186,9 +186,14 @@ void clearBuffer(float buffer[WIDTH][HEIGHT][4])
 
 int main()
 {
+#ifdef DYNAMIC_ALLOC
+    float *buffer = malloc(sizeof(float[WIDTH][HEIGHT][4]));
+#else
     float buffer[WIDTH][HEIGHT][4];
-    memset(buffer, 0, sizeof(buffer));
-
+    clearBuffer(buffer);
+#endif
+    // printf("reached here!\n");
+    // exit(0);
     for (int t = 0; t < FRAMES; t++)
     {
         from_obj(buffer, t);
@@ -198,4 +203,7 @@ int main()
         printf("\033[%zuD", (size_t)WIDTH);
         clearBuffer(buffer);
     }
+#ifdef DYNAMIC_ALLOC
+    free(buffer);
+#endif
 }
