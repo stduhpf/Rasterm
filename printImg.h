@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 char *ascii = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
 int asciiLen = 92;
@@ -178,20 +179,17 @@ void print_grayscale(float buffer[WIDTH][HEIGHT][4])
 
 void print_fc(float buffer[WIDTH][HEIGHT][4])
 {
-    int fullColorBuffer[WIDTH][HEIGHT];
-    for (int j = 0; j < HEIGHT; j++)
+    uint8_t fullColorBuffer[WIDTH][HEIGHT];
+    for (int i = 0; i < WIDTH; i++)
     {
-        for (int i = 0; i < WIDTH; i++)
+        for (int j = 0; j < HEIGHT; j++)
         {
             float r = buffer[i][j][0];
             r = r < 0. ? 0. : r;
-            r = r > 1. ? 1. : r;
             float g = buffer[i][j][1];
             g = g < 0. ? 0. : g;
-            g = g > 1. ? 1. : g;
             float b = buffer[i][j][2];
             b = b < 0. ? 0. : b;
-            b = b > 1. ? 1. : b;
 
 #ifdef DITHER
             float dr = bayer(i, j, 5);
@@ -243,17 +241,21 @@ void print_fc(float buffer[WIDTH][HEIGHT][4])
             b = sqrtf(b);
 #endif // DITHER
 
-            int c256 = 16 + ((int)(r * 6) * 36) + (int)(g * 6) * 6 + (int)(b * 6);
-            fullColorBuffer[i][j] = c256;
+            r = r > 1. ? 1. : r;
+            g = g > 1. ? 1. : g;
+            b = b > 1. ? 1. : b;
+
+            uint8_t c215 = ((int)(r * 5 + .5) * 36) + (int)(g * 5 + .5) * 6 + (int)(b * 5 + .5);
+            fullColorBuffer[i][j] = 16 + c215;
         }
     }
     char lineBuffer[BUFFER_LENGTH] = "";
+    lineBuffer[0] = 0;
     for (int j = 0; j < HEIGHT; j++)
     {
-        lineBuffer[0] = 0;
         for (int i = 0; i < WIDTH; i++)
         {
-            int c256 = fullColorBuffer[i][j];
+            uint8_t c256 = fullColorBuffer[i][j];
             int s = strlen(lineBuffer);
 
             if (s + 16 >= BUFFER_LENGTH)
@@ -266,6 +268,7 @@ void print_fc(float buffer[WIDTH][HEIGHT][4])
             // sprintf(lineBuffer + s,"%s%s%u;%u;%um ", color, full_color, (int)(g * 255), (int)(g * 255), (int)(b * 255));
             sprintf(lineBuffer + s, "%s%s;%um ", color, full_color256, c256);
         }
-        printf("%s%s%s\n", lineBuffer, color, defaultColor);
+        sprintf(lineBuffer + strlen(lineBuffer), "%s%s\n", color, defaultColor);
     }
+    printf("%s", lineBuffer);
 }
