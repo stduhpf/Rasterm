@@ -5,22 +5,22 @@
 
 #ifndef FRAMES
 #define FRAMES 1
-#endif
+#endif // FRAMES
 
 #define GRAYSCALE 0
 #define COLOR 1
 #define FULL_COLOR 2
-#define GUI 3
+#define GDI 3
 
 #ifndef RENDER_TARGET
 #define RENDER_TARGET GRAYSCALE
-#endif
+#endif // RENDER_TARGET
 
 #ifdef _WIN32
 
-#if RENDER_TARGET == GUI
+#if RENDER_TARGET == GDI
 #define RENDER_GUI
-#endif
+#endif // RENDER_TARGET
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -40,26 +40,34 @@ void usleep(__int64 usec)
 
 #else
 #include <unistd.h>
-#endif
+#endif // _WIN32
 
 #include "pot.h"
 #include "cup.h"
 
 #ifndef PX_ASPECT
-
+#ifdef RENDER_GUI
+#define PX_ASPECT 1
+#else
 #define PX_ASPECT 2.21
-#endif
+#endif // RENDER_GUI
+#endif // PX_ASPECT
 
 #ifndef ASPECT_RATIO
 #define ASPECT_RATIO 1
-#endif
+#endif // ASPECT_RATIO
 
 #ifndef HEIGHT
 #define HEIGHT 64
-#endif
+#endif // HEIGHT
 #ifndef WIDTH
 #define WIDTH ((int)(HEIGHT * PX_ASPECT * ASPECT_RATIO))
-#endif
+#endif // WIDTH
+
+#if HEIGHT * HEIGHT * 4 * 4 > 500000
+// automatically enable dynamic alloc if stack size is likely to be exceeded
+#define DYNAMIC_ALLOC
+#endif // HEIGHT
 
 #define PERSPECTIVE_UV // enable perspective texture mapping
 
@@ -122,7 +130,7 @@ void from_obj(float *buffer, int t)
         printf("\033[%zuA", (size_t)HEIGHT);
         printf("\033[%zuD", (size_t)WIDTH);
         print(buffer);
-#endif
+#endif // STEP_RENDER
     }
     ModelTransform cupTransform = {(Vector3D){2, .5, 0},
                                    0.0,
@@ -147,7 +155,7 @@ void from_obj(float *buffer, int t)
         printf("\033[%zuA", (size_t)HEIGHT);
         printf("\033[%zuD", (size_t)WIDTH);
         print(buffer);
-#endif
+#endif // STEP_RENDER
     }
     {
         attachFragmentShader(&chessboardShader);
@@ -160,7 +168,7 @@ void from_obj(float *buffer, int t)
         printf("\033[%zuA", (size_t)HEIGHT);
         printf("\033[%zuD", (size_t)WIDTH);
         print(buffer);
-#endif
+#endif // STEP_RENDER
         C = (Vector3D){4, 0, 4};
         triangle3D(fBuffer, A, B, C, (Vector3D){.6, .5, .1}, scene);
         resetFragmentShader();
@@ -175,7 +183,7 @@ void print(float buffer[WIDTH][HEIGHT][4])
     print_color(buffer);
 #else
     print_fc(buffer);
-#endif
+#endif // RENDER_TARGET
 }
 
 void clearBuffer(Framebuffer buffer)
@@ -202,7 +210,7 @@ int main()
 #else
     float buffer[WIDTH][HEIGHT][4];
     clearBuffer((Framebuffer){buffer, WIDTH, HEIGHT});
-#endif
+#endif // DYNAMIC_ALLOC
 
     for (int t = 0; t < FRAMES; t++)
     {
@@ -215,7 +223,7 @@ int main()
     }
 #ifdef DYNAMIC_ALLOC
     free(buffer);
-#endif
+#endif // DYNAMIC_ALLOC
 }
 
 #else
@@ -253,7 +261,7 @@ void CreateDIBAndCopyData(HDC hdc, HBITMAP *hBitmap, uint8_t **dibData)
             pixel[0] = (uint8_t)(b * 255); // Blue
             pixel[1] = (uint8_t)(g * 255); // Green
             pixel[2] = (uint8_t)(r * 255); // Red
-            pixel[3] = (uint8_t)(a * 255);       // Alpha
+            pixel[3] = (uint8_t)(a * 255); // Alpha
         }
     }
 }
@@ -317,6 +325,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
+#ifndef FPS
+#define FPS 60
+#endif // FPS
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     buffer = malloc(sizeof(float[WIDTH][HEIGHT][4]));
@@ -336,7 +348,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Show the window
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
-    SetTimer(hwnd, 1, 1000 / 60, NULL);
+    SetTimer(hwnd, 1, 1000 / FPS, NULL);
 
     // Main message loop
     MSG msg;

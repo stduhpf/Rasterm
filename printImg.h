@@ -1,6 +1,6 @@
 #ifndef RASTERM
 #include "rasterm.h"
-#endif
+#endif // RASTERM
 #include <math.h>
 #include <stdio.h>
 #include <string.h>

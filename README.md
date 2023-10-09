@@ -49,9 +49,10 @@ By default, it produces images like this:
 
 ### Renderer: (main.c)
 
-- `FRAMES=[n]` : Draws n consecutive animated frames (recommended) (default: 1)
-- `RENDER_TARGET=[GRAYSCALE|COLOR|FULL_COLOR]`: Change output mode (default: GRAYSCALE)
+- `FRAMES=[n]` : Draws n consecutive animated frames (recommended) (default: 1, ignored when using RENDER_TARGET=GDI)
+- `RENDER_TARGET=[GRAYSCALE|COLOR|FULL_COLOR|GDI(WINDOWS ONLY)]`: Change output mode (default: GRAYSCALE) (when using gdi, please link with gdi32)
 - `STEP_RENDER` : Refreshes the display after each triangle drawn on canvas (looks cool, but is very slow)
+- `FPS` (GDI only): number of frames to be displayed per second. (defaults to 60)
 
 ### Display lib: (printImg.h)
 
@@ -72,6 +73,13 @@ For example for a sequence of 500 dithered full color "high resolution" 16/9 ima
 ```sh
 [your c compiler] -o threed main.c -lm -DHEIGHT=128 -DASPECT_RATIO="16./9." -DFRAMES=500 -DRENDER_TARGET=FULL_COLOR -DDITHER
 ./threed
+```
+
+To compile for GDI target on windows:
+
+```sh
+[your c compiler] -o window main.c -lm -lgdi32 -DHEIGHT=720 -DASPECT_RATIO="16./9." -DRENDER_TARGET=GDI -O3
+./window
 ```
 
 ## Architecture:

@@ -3,7 +3,7 @@
 
 #ifndef ASPECT_RATIO
 #define ASPECT_RATIO 1
-#endif
+#endif // ASPECT_RATIO
 
 typedef struct
 {
@@ -120,7 +120,7 @@ void attachFragmentShader(FragmentShader fs)
 #ifndef PERSPECTIVE_UV
 #define attachFragmentShader(fs) _Pragma("message \"\n\nNOTE:\n\tThe rasterizer uses affine mapping by default.\n\tDefine PERSPECTIVE_UV if your custom shader needs the correct texture coordinates.\n\"") \
     attachFragmentShader(fs)
-#endif
+#endif // PERSPECTIVE_UV
 void resetFragmentShader()
 {
     fragmentShader = &defaultFragmentShader;
@@ -181,7 +181,7 @@ float Q_rsqrt(float number)
 
     return y;
 }
-#endif
+#endif // FAST_MATH
 
 Vector3D normalize(Vector3D a)
 {
@@ -195,7 +195,7 @@ Vector3D normalize(Vector3D a)
     a.x /= l;
     a.y /= l;
     a.z /= l;
-#endif
+#endif // FAST_MATH
     return a;
 }
 
@@ -227,7 +227,7 @@ void triangleShader(float bufferColor[4], int x, int y, Vector2D uv, float iza, 
 #ifdef PERSPECTIVE_UV
         uv.x *= iza / iz;
         uv.y *= izb / iz;
-#endif
+#endif // PERSPECTIVE_UV
         (*fragmentShader)(bufferColor, x, y, uv, iz, attribs, scene);
     }
 }
@@ -361,9 +361,9 @@ void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, Vector3D
     Vector3D Bp = project(B, scene.camera.focalLength);
     Vector3D Cp = project(C, scene.camera.focalLength);
 
-    Vector2D a = {Ap.x*buffer.width, Ap.y*buffer.height};
-    Vector2D b = {Bp.x*buffer.width, Bp.y*buffer.height};
-    Vector2D c = {Cp.x*buffer.width, Cp.y*buffer.height};
+    Vector2D a = {Ap.x * buffer.width, Ap.y * buffer.height};
+    Vector2D b = {Bp.x * buffer.width, Bp.y * buffer.height};
+    Vector2D c = {Cp.x * buffer.width, Cp.y * buffer.height};
 
     SurfaceAttributes attribs = {color, normal};
 
