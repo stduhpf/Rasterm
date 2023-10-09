@@ -7,6 +7,16 @@
 
 typedef struct
 {
+    int A;
+    int B;
+    int C;
+    int An;
+    int Bn;
+    int Cn;
+} Face;
+
+typedef struct
+{
     float *data;
     size_t width;
     size_t height;
@@ -29,6 +39,9 @@ typedef struct
 {
     Vector3D color;
     Vector3D normal;
+    Vector3D normalA;
+    Vector3D normalB;
+    Vector3D normalC;
 } SurfaceAttributes;
 
 typedef struct
@@ -58,8 +71,15 @@ typedef struct
 
 typedef void (*FragmentShader)(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene);
 
-#define MIN(a, b) (a < b ? a : b)
-#define MAX(a, b) (a > b ? a : b)
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#define SCALE_VEC3(v3, s) \
+    {                     \
+        (v3).x *= (s);    \
+        (v3).y *= (s);    \
+        (v3).z *= (s);    \
+    }
 
 float *framebufferAt(Framebuffer buffer, size_t i, size_t j);
 
@@ -91,27 +111,32 @@ Vector3D getNormal(Vector3D a, Vector3D b, Vector3D c);
 /* Converts from view space to screen space (x, y, inverse depth) */
 Vector3D project(Vector3D p, const float screenZ);
 /* Project and rasterize the 3D triangle ABC in the scene onto the frame buffer */
-void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, Vector3D color, SceneAttributes scene);
+void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, SurfaceAttributes attribs, SceneAttributes scene);
 /* Set the "fragment shader" that will be used during the next call to triangleShader() during rasterization */
 void attachFragmentShader(FragmentShader fs);
 /* Reset the fragment shader to the default flat lambert shading */
 void resetFragmentShader();
 
+#define RASTERM_IMPLEMENTATION
 #ifdef RASTERM_IMPLEMENTATION
 
 /* default shader: simple lambertian diffuse with solid color */
 static void defaultFragmentShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
 {
     float illumination = 1.;
+
+    float w = (1. - uv.x - uv.y);
+    Vector3D normal = attribs.normal;
     if (dot(attribs.normal, attribs.normal) > 0.)
     {
-        illumination = MAX(0., dot(attribs.normal, scene.lightVector)) + .05 * MAX(0., -attribs.normal.y);
+        illumination = MAX(0., dot(normal, scene.lightVector)) + .05 * MAX(0., -normal.y);
     }
     bufferColor[0] = (illumination * scene.direct.x + scene.ambient.x) * attribs.color.x;
     bufferColor[1] = (illumination * scene.direct.y + scene.ambient.y) * attribs.color.y;
     bufferColor[2] = (illumination * scene.direct.z + scene.ambient.z) * attribs.color.z;
     bufferColor[3] = inverseDepth;
 }
+
 FragmentShader fragmentShader = &defaultFragmentShader;
 void attachFragmentShader(FragmentShader fs)
 {
@@ -187,14 +212,11 @@ Vector3D normalize(Vector3D a)
 {
 #ifdef FAST_MATH
     float il = Q_rsqrt(dot(a, a));
-    a.x *= il;
-    a.y *= il;
-    a.z *= il;
+    SCALE_VEC3(a, il);
 #else
     float l = sqrtf(dot(a, a));
-    a.x /= l;
-    a.y /= l;
-    a.z /= l;
+    float il = 1. / l;
+    SCALE_VEC3(a, il);
 #endif // FAST_MATH
     return a;
 }
@@ -329,9 +351,9 @@ Vector3D getNormal(Vector3D a, Vector3D b, Vector3D c)
     Vector3D A = {a.x - c.x,
                   a.y - c.y,
                   a.z - c.z};
-    Vector3D B = {b.x - c.x,
-                  b.y - c.y,
-                  b.z - c.z};
+    Vector3D B = {c.x - b.x,
+                  c.y - b.y,
+                  c.z - b.z};
     return normalize(cross(B, A));
 }
 
@@ -345,13 +367,8 @@ Vector3D project(Vector3D p, const float screenZ)
     return ret;
 }
 
-void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, Vector3D color, SceneAttributes scene)
+void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, SurfaceAttributes attribs, SceneAttributes scene)
 {
-    Vector3D normal = getNormal(A, B, C);
-
-    // Fix normals (ideally this step should not be required, but whatever)
-    if (dot(normal, (Vector3D){A.x - scene.camera.position.x, A.y - scene.camera.position.y, A.z - scene.camera.position.z}) < 0.)
-        normal = (Vector3D){-normal.x, -normal.y, -normal.z};
 
     A = getViewPos(A, scene.camera);
     B = getViewPos(B, scene.camera);
@@ -364,8 +381,6 @@ void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, Vector3D
     Vector2D a = {Ap.x * buffer.width, Ap.y * buffer.height};
     Vector2D b = {Bp.x * buffer.width, Bp.y * buffer.height};
     Vector2D c = {Cp.x * buffer.width, Cp.y * buffer.height};
-
-    SurfaceAttributes attribs = {color, normal};
 
     triangle2D(buffer, a, b, c, Ap.z, Bp.z, Cp.z, attribs, scene);
 }

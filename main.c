@@ -76,6 +76,7 @@ void usleep(__int64 usec)
 #include "rasterm.h"
 
 #include "printImg.h"
+#include "parseObj.c"
 
 void chessboardShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
 {
@@ -88,6 +89,28 @@ void chessboardShader(float bufferColor[4], int x, int y, Vector2D uv, float inv
     bufferColor[0] = (illumination * scene.direct.x + scene.ambient.x) * attribs.color.x * texture;
     bufferColor[1] = (illumination * scene.direct.y + scene.ambient.y) * attribs.color.y * texture;
     bufferColor[2] = (illumination * scene.direct.z + scene.ambient.z) * attribs.color.z * texture;
+    bufferColor[3] = inverseDepth;
+}
+
+void gouraudFragmentShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
+{
+    float illumination = 1.;
+
+    float w = (1. - uv.x - uv.y);
+    Vector3D normal = (Vector3D){
+        uv.x * attribs.normalA.x + uv.y * attribs.normalB.x + w * attribs.normalC.x,
+        uv.x * attribs.normalA.y + uv.y * attribs.normalB.y + w * attribs.normalC.y,
+        uv.x * attribs.normalA.z + uv.y * attribs.normalB.z + w * attribs.normalC.z};
+
+    float normalLength = dot(attribs.normal, attribs.normal);
+    if (dot(attribs.normal, attribs.normal) > 0.)
+    {
+        SCALE_VEC3(normal, 1. / sqrtf(normalLength));
+        illumination = MAX(0., dot(normal, scene.lightVector)) + .05 * MAX(0., -normal.y);
+    }
+    bufferColor[0] = (illumination * scene.direct.x + scene.ambient.x) * attribs.color.x;
+    bufferColor[1] = (illumination * scene.direct.y + scene.ambient.y) * attribs.color.y;
+    bufferColor[2] = (illumination * scene.direct.z + scene.ambient.z) * attribs.color.z;
     bufferColor[3] = inverseDepth;
 }
 
@@ -115,28 +138,77 @@ void from_obj(float *buffer, int t)
                                    0.1,
                                    0.0,
                                    0.4,
-                                   (Vector3D){-1, -1, -1}};
+                                   (Vector3D){-0.15, -0.15, -0.15}};
+
+    char *path = "teapot.obj";
+    int vertexCount = 0, normalCount = 0, faceCount = 0;
+
 #pragma omp parallel
     {
-#pragma omp for
-        for (int f = 0; f < faces_count_pot; f++)
+        // TODO: avoid reading and parsing the whole file every frame
+        if (countObjects(path, &vertexCount, &normalCount, &faceCount))
         {
+            // TODO: avoid allocating and freeing the same data every frame
+            Vector3D *vertices = malloc(sizeof(Vector3D) * vertexCount);
+            Vector3D *normals = malloc(sizeof(Vector3D) * normalCount);
+            Face *faces = malloc(sizeof(Face) * faceCount);
 
-            Vector3D A = (Vector3D){vertices_pot[faces_pot[f][0]][0], vertices_pot[faces_pot[f][0]][1], vertices_pot[faces_pot[f][0]][2]};
-            Vector3D B = (Vector3D){vertices_pot[faces_pot[f][1]][0], vertices_pot[faces_pot[f][1]][1], vertices_pot[faces_pot[f][1]][2]};
-            Vector3D C = (Vector3D){vertices_pot[faces_pot[f][2]][0], vertices_pot[faces_pot[f][2]][1], vertices_pot[faces_pot[f][2]][2]};
+            parseObjects(path, vertices, normals, faces);
 
-            A = getWorldPos(A, potTransform);
-            B = getWorldPos(B, potTransform);
-            C = getWorldPos(C, potTransform);
+            attachFragmentShader(&gouraudFragmentShader);
+            for (int f = 0; f < faceCount; f++)
+            {
+                Vector3D A = vertices[faces[f].A - 1];
+                Vector3D B = vertices[faces[f].B - 1];
+                Vector3D C = vertices[faces[f].C - 1];
 
-            triangle3D(fBuffer, A, B, C, (Vector3D){1, .5, .5}, scene);
+                Vector3D normal = getNormal(A, B, C);
+
+                A = getWorldPos(A, potTransform);
+                B = getWorldPos(B, potTransform);
+                C = getWorldPos(C, potTransform);
+                SurfaceAttributes attributes = (SurfaceAttributes){
+                    (Vector3D){1, .5, .5}, normal,
+                    normals[faces[f].An - 1],
+                    normals[faces[f].Bn - 1],
+                    normals[faces[f].Cn - 1]};
+                triangle3D(fBuffer, A, B, C, attributes, scene);
+            }
+            resetFragmentShader();
+
+            // TODO: avoid allocating and freeing the same data every frame
+            free(vertices);
+            free(normals);
+            free(faces);
+        }
+        else
+        {
+#pragma omp for
+            for (int f = 0; f < faces_count_pot && 0; f++)
+            {
+
+                Vector3D A = (Vector3D){vertices_pot[faces_pot[f][0]][0], vertices_pot[faces_pot[f][0]][1], vertices_pot[faces_pot[f][0]][2]};
+                Vector3D B = (Vector3D){vertices_pot[faces_pot[f][1]][0], vertices_pot[faces_pot[f][1]][1], vertices_pot[faces_pot[f][1]][2]};
+                Vector3D C = (Vector3D){vertices_pot[faces_pot[f][2]][0], vertices_pot[faces_pot[f][2]][1], vertices_pot[faces_pot[f][2]][2]};
+
+                A = getWorldPos(A, potTransform);
+                B = getWorldPos(B, potTransform);
+                C = getWorldPos(C, potTransform);
+
+                SurfaceAttributes attributes = {0};
+                attributes.color = (Vector3D){1, .5, .5};
+                attributes.normal = getNormal(A, B, C);
+                attributes.normalA = attributes.normal;
+                attributes.normalB = attributes.normal;
+                attributes.normalC = attributes.normal;
+                triangle3D(fBuffer, A, B, C, attributes, scene);
 
 #ifdef STEP_RENDER
-            printf("\033[%zuA", (size_t)HEIGHT);
-            printf("\033[%zuD", (size_t)WIDTH);
-            print(buffer);
+                printf("\033[%zuA", (size_t)HEIGHT);
+                printf("\033[%zuD", (size_t)WIDTH);
+                print(buffer);
 #endif // STEP_RENDER
+            }
         }
         ModelTransform cupTransform = {(Vector3D){2, .5, 0},
                                        0.0,
@@ -156,7 +228,14 @@ void from_obj(float *buffer, int t)
             B = getWorldPos(B, cupTransform);
             C = getWorldPos(C, cupTransform);
 
-            triangle3D(fBuffer, A, B, C, (Vector3D){1, 1, 1}, scene);
+            SurfaceAttributes attributes = {0};
+            attributes.color = (Vector3D){1, 1, 1};
+            attributes.normal = getNormal(A, B, C);
+            // Fix normals (ideally this step should not be required, but whatever)
+            attributes.normalA = attributes.normal;
+            attributes.normalB = attributes.normal;
+            attributes.normalC = attributes.normal;
+            triangle3D(fBuffer, A, B, C, attributes, scene);
 
 #ifdef STEP_RENDER
             printf("\033[%zuA", (size_t)HEIGHT);
@@ -171,14 +250,18 @@ void from_obj(float *buffer, int t)
         Vector3D A = (Vector3D){-4, 0, 4};
         Vector3D B = (Vector3D){4, 0, -4};
         Vector3D C = (Vector3D){-4, 0, -4};
-        triangle3D(fBuffer, A, B, C, (Vector3D){.6, .5, .1}, scene);
+
+        SurfaceAttributes attributes = {0};
+        attributes.color = (Vector3D){.6, .5, .1};
+        attributes.normal.y = attributes.normalA.y = attributes.normalB.y = attributes.normalC.y = 1;
+        triangle3D(fBuffer, A, B, C, attributes, scene);
 #ifdef STEP_RENDER
         printf("\033[%zuA", (size_t)HEIGHT);
         printf("\033[%zuD", (size_t)WIDTH);
         print(buffer);
 #endif // STEP_RENDER
         C = (Vector3D){4, 0, 4};
-        triangle3D(fBuffer, A, B, C, (Vector3D){.6, .5, .1}, scene);
+        triangle3D(fBuffer, A, B, C, attributes, scene);
         resetFragmentShader();
     }
 #ifdef LOG_FPS
