@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 
-// #include <omp.h>
+#include <omp.h>
 
 #ifndef FRAMES
 #define FRAMES 1
@@ -20,6 +20,7 @@
 
 #if RENDER_TARGET == GDI
 #define RENDER_GUI
+#include <time.h>
 #endif // RENDER_TARGET
 
 #define WIN32_LEAN_AND_MEAN
@@ -93,6 +94,9 @@ void chessboardShader(float bufferColor[4], int x, int y, Vector2D uv, float inv
 void print(float buffer[WIDTH][HEIGHT][4]);
 void from_obj(float *buffer, int t)
 {
+#ifdef LOG_FPS
+    clock_t begin = clock();
+#endif
     Framebuffer fBuffer = {(float *)buffer, WIDTH, HEIGHT};
     const float cameraRotateSpeed = .01f;
     float cameraRotXZ = t * cameraRotateSpeed;
@@ -107,55 +111,59 @@ void from_obj(float *buffer, int t)
 
     SceneAttributes scene = {lightVec, (Vector3D){.999, .999, .995}, (Vector3D){.005, .005, .01}, camera};
 
-    // #pragma omp parallel for
     ModelTransform potTransform = {(Vector3D){-1, 2, 0},
                                    0.1,
                                    0.0,
                                    0.4,
                                    (Vector3D){-1, -1, -1}};
-    for (int f = 0; f < faces_count_pot; f++)
+#pragma omp parallel
     {
+#pragma omp for
+        for (int f = 0; f < faces_count_pot; f++)
+        {
 
-        Vector3D A = (Vector3D){vertices_pot[faces_pot[f][0]][0], vertices_pot[faces_pot[f][0]][1], vertices_pot[faces_pot[f][0]][2]};
-        Vector3D B = (Vector3D){vertices_pot[faces_pot[f][1]][0], vertices_pot[faces_pot[f][1]][1], vertices_pot[faces_pot[f][1]][2]};
-        Vector3D C = (Vector3D){vertices_pot[faces_pot[f][2]][0], vertices_pot[faces_pot[f][2]][1], vertices_pot[faces_pot[f][2]][2]};
+            Vector3D A = (Vector3D){vertices_pot[faces_pot[f][0]][0], vertices_pot[faces_pot[f][0]][1], vertices_pot[faces_pot[f][0]][2]};
+            Vector3D B = (Vector3D){vertices_pot[faces_pot[f][1]][0], vertices_pot[faces_pot[f][1]][1], vertices_pot[faces_pot[f][1]][2]};
+            Vector3D C = (Vector3D){vertices_pot[faces_pot[f][2]][0], vertices_pot[faces_pot[f][2]][1], vertices_pot[faces_pot[f][2]][2]};
 
-        A = getWorldPos(A, potTransform);
-        B = getWorldPos(B, potTransform);
-        C = getWorldPos(C, potTransform);
+            A = getWorldPos(A, potTransform);
+            B = getWorldPos(B, potTransform);
+            C = getWorldPos(C, potTransform);
 
-        triangle3D(fBuffer, A, B, C, (Vector3D){1, .5, .5}, scene);
+            triangle3D(fBuffer, A, B, C, (Vector3D){1, .5, .5}, scene);
 
 #ifdef STEP_RENDER
-        printf("\033[%zuA", (size_t)HEIGHT);
-        printf("\033[%zuD", (size_t)WIDTH);
-        print(buffer);
+            printf("\033[%zuA", (size_t)HEIGHT);
+            printf("\033[%zuD", (size_t)WIDTH);
+            print(buffer);
 #endif // STEP_RENDER
-    }
-    ModelTransform cupTransform = {(Vector3D){2, .5, 0},
-                                   0.0,
-                                   0.5,
-                                   0.0,
-                                   (Vector3D){-1, -1, -1}};
-    for (int f = 0; f < faces_count_cup; f++)
-    {
+        }
+        ModelTransform cupTransform = {(Vector3D){2, .5, 0},
+                                       0.0,
+                                       0.5,
+                                       0.0,
+                                       (Vector3D){-1, -1, -1}};
+#pragma omp for
+        for (int f = 0; f < faces_count_cup; f++)
+        {
 
-        // normals are broken because of inconsistent vertex order
-        Vector3D A = (Vector3D){vertices_cup[faces_cup[f][0]][0], vertices_cup[faces_cup[f][0]][1], vertices_cup[faces_cup[f][0]][2]};
-        Vector3D B = (Vector3D){vertices_cup[faces_cup[f][1]][0], vertices_cup[faces_cup[f][1]][1], vertices_cup[faces_cup[f][1]][2]};
-        Vector3D C = (Vector3D){vertices_cup[faces_cup[f][2]][0], vertices_cup[faces_cup[f][2]][1], vertices_cup[faces_cup[f][2]][2]};
+            // normals are broken because of inconsistent vertex order
+            Vector3D A = (Vector3D){vertices_cup[faces_cup[f][0]][0], vertices_cup[faces_cup[f][0]][1], vertices_cup[faces_cup[f][0]][2]};
+            Vector3D B = (Vector3D){vertices_cup[faces_cup[f][1]][0], vertices_cup[faces_cup[f][1]][1], vertices_cup[faces_cup[f][1]][2]};
+            Vector3D C = (Vector3D){vertices_cup[faces_cup[f][2]][0], vertices_cup[faces_cup[f][2]][1], vertices_cup[faces_cup[f][2]][2]};
 
-        A = getWorldPos(A, cupTransform);
-        B = getWorldPos(B, cupTransform);
-        C = getWorldPos(C, cupTransform);
+            A = getWorldPos(A, cupTransform);
+            B = getWorldPos(B, cupTransform);
+            C = getWorldPos(C, cupTransform);
 
-        triangle3D(fBuffer, A, B, C, (Vector3D){1, 1, 1}, scene);
+            triangle3D(fBuffer, A, B, C, (Vector3D){1, 1, 1}, scene);
 
 #ifdef STEP_RENDER
-        printf("\033[%zuA", (size_t)HEIGHT);
-        printf("\033[%zuD", (size_t)WIDTH);
-        print(buffer);
+            printf("\033[%zuA", (size_t)HEIGHT);
+            printf("\033[%zuD", (size_t)WIDTH);
+            print(buffer);
 #endif // STEP_RENDER
+        }
     }
     {
         attachFragmentShader(&chessboardShader);
@@ -173,6 +181,17 @@ void from_obj(float *buffer, int t)
         triangle3D(fBuffer, A, B, C, (Vector3D){.6, .5, .1}, scene);
         resetFragmentShader();
     }
+#ifdef LOG_FPS
+    clock_t end = clock();
+    double ft = (double)(end - begin) / CLOCKS_PER_SEC;
+    static double maxft = 0;
+    static double avgft = 0;
+    if (ft > maxft)
+        maxft = ft;
+    maxft = .98 * maxft + .02 * ft;
+    avgft = t == 0 ? ft : .98 * avgft + .02 * ft;
+    printf("current framerate = %f fps\tsmooth_avg = %f fps\tsmmoth_low = %f fps\n", 1. / ft, 1. / avgft, 1. / maxft);
+#endif // RENDER_GUI
 }
 
 void print(float buffer[WIDTH][HEIGHT][4])
@@ -356,7 +375,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
-        from_obj(buffer, ++frame);
     }
 
     // Clean up and exit
