@@ -162,7 +162,7 @@ bool parseObjects(char *filename, Vector3D *vertices, Vector3D *normals, Face *f
                     numBuffer[c] = '\0';
                     coords[i] = atof(numBuffer);
                 }
-                printf("UV %d\tu=%f\tv=%f\n", uvindex + 1, coords[0], coords[1]);
+                // printf("UV %d\tu=%f\tv=%f\n", uvindex + 1, coords[0], coords[1]);
                 uvs[uvindex] = (Vector2D){coords[0], coords[1]};
                 uvindex++;
                 break;
