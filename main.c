@@ -114,6 +114,12 @@ void gouraudFragmentShader(float bufferColor[4], int x, int y, Vector2D uv, floa
     bufferColor[3] = inverseDepth;
 }
 
+bool objLoaded = false;
+Vector3D *vertices = NULL;
+Vector3D *normals = NULL;
+Face *faces = NULL;
+int faceCount;
+
 void print(float buffer[WIDTH][HEIGHT][4]);
 void from_obj(float *buffer, int t)
 {
@@ -140,21 +146,11 @@ void from_obj(float *buffer, int t)
                                    0.4,
                                    (Vector3D){-0.15, -0.15, -0.15}};
 
-    char *path = "teapot.obj";
-    int vertexCount = 0, normalCount = 0, faceCount = 0;
-
 #pragma omp parallel
     {
-        // TODO: avoid reading and parsing the whole file every frame
-        if (countObjects(path, &vertexCount, &normalCount, &faceCount))
+        if (objLoaded)
         {
-            // TODO: avoid allocating and freeing the same data every frame
-            Vector3D *vertices = malloc(sizeof(Vector3D) * vertexCount);
-            Vector3D *normals = malloc(sizeof(Vector3D) * normalCount);
-            Face *faces = malloc(sizeof(Face) * faceCount);
-
-            parseObjects(path, vertices, normals, faces);
-
+            // printf("%d faces\n", faceCount);
             attachFragmentShader(&gouraudFragmentShader);
             for (int f = 0; f < faceCount; f++)
             {
@@ -175,16 +171,11 @@ void from_obj(float *buffer, int t)
                 triangle3D(fBuffer, A, B, C, attributes, scene);
             }
             resetFragmentShader();
-
-            // TODO: avoid allocating and freeing the same data every frame
-            free(vertices);
-            free(normals);
-            free(faces);
         }
         else
         {
 #pragma omp for
-            for (int f = 0; f < faces_count_pot && 0; f++)
+            for (int f = 0; f < faces_count_pot; f++)
             {
 
                 Vector3D A = (Vector3D){vertices_pot[faces_pot[f][0]][0], vertices_pot[faces_pot[f][0]][1], vertices_pot[faces_pot[f][0]][2]};
@@ -304,9 +295,34 @@ void clearBuffer(Framebuffer buffer)
     }
 }
 
+void loadObj()
+{
+    char *path = "teapot.obj";
+    faceCount = 0;
+    int vertexCount = 0, normalCount = 0;
+    if (countObjects(path, &vertexCount, &normalCount, &faceCount))
+    {
+        vertices = malloc(sizeof(Vector3D) * vertexCount);
+        normals = malloc(sizeof(Vector3D) * normalCount);
+        faces = malloc(sizeof(Face) * faceCount);
+
+        objLoaded = parseObjects(path, vertices, normals, faces);
+        if (objLoaded)
+            printf("%s loaded\n", path);
+    }
+}
+
+void unloadObj()
+{
+    free(vertices);
+    free(normals);
+    free(faces);
+}
+
 #ifndef RENDER_GUI
 int main()
 {
+    loadObj();
 #ifdef DYNAMIC_ALLOC
     float *buffer = malloc(sizeof(float[WIDTH][HEIGHT][4]));
 #else
@@ -326,6 +342,7 @@ int main()
 #ifdef DYNAMIC_ALLOC
     free(buffer);
 #endif // DYNAMIC_ALLOC
+    unloadObj();
 }
 
 #else
@@ -433,6 +450,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
+    loadObj();
     buffer = malloc(sizeof(float[WIDTH][HEIGHT][4]));
     from_obj(buffer, 0);
     // Register the window class
@@ -462,6 +480,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // Clean up and exit
     UnregisterClass(wc.lpszClassName, wc.hInstance);
+    unloadObj();
     return 0;
 }
 #endif // _WIN32
