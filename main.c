@@ -114,10 +114,27 @@ void gouraudFragmentShader(float bufferColor[4], int x, int y, Vector2D uv, floa
     bufferColor[3] = inverseDepth;
 }
 
+void debugUVs(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
+{
+    float illumination = 1.;
+
+    float w = (1. - uv.x - uv.y);
+    Vector2D texture_uv = (Vector2D){
+        (uv.x * attribs.uvA.x + uv.y * attribs.uvB.x + w * attribs.uvC.x)*.5,
+        (uv.x * attribs.uvA.y + uv.y * attribs.uvB.y + w * attribs.uvC.y)*.5};
+
+    float normalLength = dot(attribs.normal, attribs.normal);
+    bufferColor[0] = texture_uv.x;
+    bufferColor[1] = texture_uv.y;
+    bufferColor[2] = 0;
+    bufferColor[3] = inverseDepth;
+}
+
 bool objLoaded = false;
 Vector3D *vertices = NULL;
 Vector3D *normals = NULL;
 Face *faces = NULL;
+Vector2D *uvs = NULL;
 int faceCount;
 
 void print(float buffer[WIDTH][HEIGHT][4]);
@@ -152,6 +169,7 @@ void from_obj(float *buffer, int t)
         {
             // printf("%d faces\n", faceCount);
             attachFragmentShader(&gouraudFragmentShader);
+            // attachFragmentShader(&debugUVs);
             for (int f = 0; f < faceCount; f++)
             {
                 Vector3D A = vertices[faces[f].A - 1];
@@ -164,10 +182,15 @@ void from_obj(float *buffer, int t)
                 B = getWorldPos(B, potTransform);
                 C = getWorldPos(C, potTransform);
                 SurfaceAttributes attributes = (SurfaceAttributes){
-                    (Vector3D){1, .5, .5}, normal,
+                    (Vector3D){1, .5, .5},
+                    normal,
                     normals[faces[f].An - 1],
                     normals[faces[f].Bn - 1],
-                    normals[faces[f].Cn - 1]};
+                    normals[faces[f].Cn - 1],
+                    uvs[faces[f].Auv - 1],
+                    uvs[faces[f].Buv - 1],
+                    uvs[faces[f].Cuv - 1],
+                };
                 triangle3D(fBuffer, A, B, C, attributes, scene);
             }
             resetFragmentShader();
@@ -299,14 +322,16 @@ void loadObj()
 {
     char *path = "teapot.obj";
     faceCount = 0;
-    int vertexCount = 0, normalCount = 0;
-    if (countObjects(path, &vertexCount, &normalCount, &faceCount))
+    int vertexCount = 0, normalCount = 0, uvCount = 0;
+    if (countObjects(path, &vertexCount, &normalCount, &faceCount, &uvCount))
     {
         vertices = malloc(sizeof(Vector3D) * vertexCount);
         normals = malloc(sizeof(Vector3D) * normalCount);
         faces = malloc(sizeof(Face) * faceCount);
+        uvs = malloc(sizeof(Vector2D) * uvCount);
 
-        objLoaded = parseObjects(path, vertices, normals, faces);
+        objLoaded = parseObjects(path, vertices, normals, faces, uvs);
+        // free(uvs);
         if (objLoaded)
             printf("%s loaded\n", path);
     }
@@ -317,6 +342,7 @@ void unloadObj()
     free(vertices);
     free(normals);
     free(faces);
+    free(uvs);
 }
 
 #ifndef RENDER_GUI

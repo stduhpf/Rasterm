@@ -7,16 +7,6 @@
 
 typedef struct
 {
-    int A;
-    int B;
-    int C;
-    int An;
-    int Bn;
-    int Cn;
-} Face;
-
-typedef struct
-{
     float *data;
     size_t width;
     size_t height;
@@ -42,6 +32,9 @@ typedef struct
     Vector3D normalA;
     Vector3D normalB;
     Vector3D normalC;
+    Vector2D uvA;
+    Vector2D uvB;
+    Vector2D uvC;
 } SurfaceAttributes;
 
 typedef struct

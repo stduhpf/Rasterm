@@ -6,7 +6,20 @@
 #include "rasterm.h"
 #endif // RASTERM
 
-bool countObjects(char *filename, int *vertexCount, int *normalCount, int *faceCount)
+typedef struct
+{
+    int A;
+    int B;
+    int C;
+    int An;
+    int Bn;
+    int Cn;
+    int Auv;
+    int Buv;
+    int Cuv;
+} Face;
+
+bool countObjects(char *filename, int *vertexCount, int *normalCount, int *faceCount, int *uvCount)
 {
     FILE *fptr;
 
@@ -39,6 +52,11 @@ bool countObjects(char *filename, int *vertexCount, int *normalCount, int *faceC
                 (*vertexCount)++;
                 break;
             }
+            case 't':
+            {
+                (*uvCount)++;
+                break;
+            }
             case 'n':
             {
                 (*normalCount)++;
@@ -65,11 +83,12 @@ bool countObjects(char *filename, int *vertexCount, int *normalCount, int *faceC
     return true;
 }
 
-bool parseObjects(char *filename, Vector3D *vertices, Vector3D *normals, Face *faces)
+bool parseObjects(char *filename, Vector3D *vertices, Vector3D *normals, Face *faces, Vector2D *uvs)
 {
     int vertexIndex = 0;
     int normalIndex = 0;
     int faceIndex = 0;
+    int uvindex = 0;
     FILE *fptr;
 
     // Open a file in read mode
@@ -122,6 +141,32 @@ bool parseObjects(char *filename, Vector3D *vertices, Vector3D *normals, Face *f
                 vertexIndex++;
                 break;
             }
+            case 't':
+            {
+                float coords[2];
+                for (int i = 0; i < 2; ++i)
+                {
+                    while ((ch = fgetc(fptr)) == ' ')
+                        if (ch == EOF)
+                            break;
+                    ;
+                    size_t c = 0;
+                    while (ch != ' ')
+                    {
+                        numBuffer[c++] = ch;
+                        ch = fgetc(fptr);
+
+                        if (ch == '\n')
+                            break;
+                    }
+                    numBuffer[c] = '\0';
+                    coords[i] = atof(numBuffer);
+                }
+                printf("UV %d\tu=%f\tv=%f\n", uvindex + 1, coords[0], coords[1]);
+                uvs[uvindex] = (Vector2D){coords[0], coords[1]};
+                uvindex++;
+                break;
+            }
             case 'n':
             {
                 float components[3];
@@ -154,6 +199,7 @@ bool parseObjects(char *filename, Vector3D *vertices, Vector3D *normals, Face *f
         case 'f':
         {
             int faceVertices[3];
+            int faceUVs[3] = {0, 0, 0};
             int faceNormals[3] = {0, 0, 0};
             for (int i = 0; i < 3; ++i)
             {
@@ -163,19 +209,28 @@ bool parseObjects(char *filename, Vector3D *vertices, Vector3D *normals, Face *f
                 ;
                 size_t c = 0;
                 bool vertexSet = false;
+                bool uvSet = false;
+
                 while (ch != ' ')
                 {
                     numBuffer[c++] = ch;
                     ch = fgetc(fptr);
                     if (ch == '/') // TODO: support vertex uv?
+                    {
+                        numBuffer[c] = '\0';
+                        faceVertices[i] = atoi(numBuffer);
+                        vertexSet = true;
+                        c = 0;
+                        ch = fgetc(fptr);
                         while (ch != ' ')
                         {
+                            numBuffer[c++] = ch;
                             ch = fgetc(fptr);
                             if (ch == '/')
                             {
-                                vertexSet = true;
                                 numBuffer[c] = '\0';
-                                faceVertices[i] = atoi(numBuffer);
+                                faceUVs[i] = atoi(numBuffer);
+                                uvSet = true;
                                 c = 0;
                                 ch = fgetc(fptr);
                                 while (ch != ' ')
@@ -191,6 +246,12 @@ bool parseObjects(char *filename, Vector3D *vertices, Vector3D *normals, Face *f
                             if (ch == '\n')
                                 break;
                         }
+                        if (!uvSet)
+                        {
+                            numBuffer[c] = '\0';
+                            faceUVs[i] = atoi(numBuffer);
+                        }
+                    }
                     if (ch == '\n')
                         break;
                 }
@@ -207,6 +268,9 @@ bool parseObjects(char *filename, Vector3D *vertices, Vector3D *normals, Face *f
             faces[faceIndex].An = faceNormals[0];
             faces[faceIndex].Bn = faceNormals[1];
             faces[faceIndex].Cn = faceNormals[2];
+            faces[faceIndex].Auv = faceUVs[0];
+            faces[faceIndex].Buv = faceUVs[1];
+            faces[faceIndex].Cuv = faceUVs[2];
 
             faceIndex++;
             break;
