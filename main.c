@@ -81,7 +81,7 @@ void usleep(__int64 usec)
 #ifdef TEXTURED
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#endif //TEXTURED
+#endif // TEXTURED
 
 void chessboardShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
 {
@@ -200,8 +200,6 @@ void from_obj(float *buffer, int t)
                                    0.0,
                                    0.4,
                                    (Vector3D){-0.15, -0.15, -0.15}};
-
-#pragma omp parallel
     {
         if (objLoaded)
         {
@@ -210,7 +208,7 @@ void from_obj(float *buffer, int t)
             attachFragmentShader(&texturedGouraudShader);
 #else
             attachFragmentShader(&gouraudFragmentShader);
-#endif //TEXTURED
+#endif // TEXTURED
 
             // attachFragmentShader(&debugUVs);
             for (int f = 0; f < faceCount; f++)
@@ -239,7 +237,6 @@ void from_obj(float *buffer, int t)
         }
         else
         {
-#pragma omp for
             for (int f = 0; f < faces_count_pot; f++)
             {
 
@@ -269,7 +266,6 @@ void from_obj(float *buffer, int t)
                                        0.5,
                                        0.0,
                                        (Vector3D){-1, -1, -1}};
-#pragma omp for
         for (int f = 0; f < faces_count_cup; f++)
         {
 
@@ -361,7 +357,7 @@ void loadObj()
 #ifdef TEXTURED
     char *filename = "texture1.png";
     texture = stbi_load(filename, &img_width, &img_height, 0, 4);
-#endif //TEXTURED
+#endif // TEXTURED
     char *path = "teapot.obj";
     faceCount = 0;
     int vertexCount = 0, normalCount = 0, uvCount = 0;
@@ -387,7 +383,7 @@ void unloadObj()
     free(uvs);
 #ifdef TEXTURED
     stbi_image_free(texture);
-#endif //TEXTURED
+#endif // TEXTURED
 }
 
 #ifndef RENDER_GUI
