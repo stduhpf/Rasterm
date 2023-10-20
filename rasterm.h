@@ -4,6 +4,7 @@
 #ifndef ASPECT_RATIO
 #define ASPECT_RATIO 1
 #endif // ASPECT_RATIO
+#include <stdint.h>
 
 typedef struct
 {
@@ -63,6 +64,7 @@ typedef struct
 } ModelTransform;
 
 typedef void (*FragmentShader)(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene);
+typedef Vector3D (*VertexShader)(Vector3D Vertex, Camera camera);
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -94,7 +96,7 @@ void triangleShader(float bufferColor[4], int x, int y, Vector2D uv, float iza, 
 /* Rasterize 2D triangle abc onto the frame buffer, performing depth culling with the inverse z values of each vertex */
 void triangle2D(Framebuffer buffer, Vector2D a, Vector2D b, Vector2D c, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene);
 /* Converts points in model space to points in world space */
-Vector3D getWorldPos(Vector3D modelPos, ModelTransform transform);
+Vector3D model2WorldTransform(Vector3D modelPos, ModelTransform *transform);
 /* Converts points in world space to points in view space */
 Vector3D getViewPos(Vector3D worldPos, Camera cam);
 /* Converts vectors in world space to vectors in view space */
@@ -105,13 +107,31 @@ Vector3D getNormal(Vector3D a, Vector3D b, Vector3D c);
 Vector3D project(Vector3D p, const float screenZ);
 /* Project and rasterize the 3D triangle ABC in the scene onto the frame buffer */
 void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, SurfaceAttributes attribs, SceneAttributes scene);
+/* Set the "vertex shader" that will be used on each vertex during the next call to triangle3D() */
+void attachVertexShader(VertexShader fs);
+/* Reset the vertex shader to the default simple shader */
+void resetVertexShader();
 /* Set the "fragment shader" that will be used during the next call to triangleShader() during rasterization */
 void attachFragmentShader(FragmentShader fs);
 /* Reset the fragment shader to the default flat lambert shading */
 void resetFragmentShader();
+/* Set the transform for placing the model in the world */
+void attachModelTransform(ModelTransform *mt);
+/* Reset the model transform to the default (no transform) */
+void resetModelTransform();
 
 #define RASTERM_IMPLEMENTATION
 #ifdef RASTERM_IMPLEMENTATION
+
+ModelTransform *modelTransform = (ModelTransform *)NULL;
+void attachModelTransform(ModelTransform *mt)
+{
+    modelTransform = mt;
+}
+void resetModelTransform()
+{
+    modelTransform = (ModelTransform *)NULL;
+}
 
 /* default shader: simple lambertian diffuse with solid color */
 static void defaultFragmentShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
@@ -129,7 +149,6 @@ static void defaultFragmentShader(float bufferColor[4], int x, int y, Vector2D u
     bufferColor[2] = (illumination * scene.direct.z + scene.ambient.z) * attribs.color.z;
     bufferColor[3] = inverseDepth;
 }
-
 FragmentShader fragmentShader = &defaultFragmentShader;
 void attachFragmentShader(FragmentShader fs)
 {
@@ -143,6 +162,25 @@ void resetFragmentShader()
 {
     fragmentShader = &defaultFragmentShader;
 }
+
+/* default vertex shader: apply model transform and camera transform */
+static Vector3D defaultVertexShader(Vector3D V, Camera c)
+{
+    if (modelTransform)
+        V = model2WorldTransform(V, modelTransform);
+    V = getViewPos(V, c);
+    return project(V, c.focalLength);
+}
+VertexShader vertexShader = &defaultVertexShader;
+void attachVertexShader(VertexShader vs)
+{
+    vertexShader = vs;
+}
+void resetVertexShader()
+{
+    vertexShader = &defaultVertexShader;
+}
+
 
 float *framebufferAt(Framebuffer buffer, size_t i, size_t j)
 {
@@ -273,27 +311,27 @@ void triangle2D(Framebuffer buffer, Vector2D a, Vector2D b, Vector2D c, float iz
     }
 }
 
-Vector3D getWorldPos(Vector3D modelPos, ModelTransform transform)
+Vector3D model2WorldTransform(Vector3D modelPos, ModelTransform *transform)
 {
-    modelPos.x = modelPos.x * transform.scale.x;
-    modelPos.y = modelPos.y * transform.scale.y;
-    modelPos.z = modelPos.z * transform.scale.z;
+    modelPos.x = modelPos.x * transform->scale.x;
+    modelPos.y = modelPos.y * transform->scale.y;
+    modelPos.z = modelPos.z * transform->scale.z;
 
     Vector2D xy = {modelPos.x, modelPos.y};
-    modelPos.x = cosf(transform.rotXY) * xy.x + sinf(transform.rotXY) * xy.y;
-    modelPos.y = -sinf(transform.rotXY) * xy.x + cosf(transform.rotXY) * xy.y;
+    modelPos.x = cosf(transform->rotXY) * xy.x + sinf(transform->rotXY) * xy.y;
+    modelPos.y = -sinf(transform->rotXY) * xy.x + cosf(transform->rotXY) * xy.y;
 
     Vector2D xz = {modelPos.x, modelPos.z};
-    modelPos.x = cosf(transform.rotXZ) * xz.x + sinf(transform.rotXZ) * xz.y;
-    modelPos.z = -sinf(transform.rotXZ) * xz.x + cosf(transform.rotXZ) * xz.y;
+    modelPos.x = cosf(transform->rotXZ) * xz.x + sinf(transform->rotXZ) * xz.y;
+    modelPos.z = -sinf(transform->rotXZ) * xz.x + cosf(transform->rotXZ) * xz.y;
 
     Vector2D yz = {modelPos.y, modelPos.z};
-    modelPos.y = cosf(transform.rotYZ) * yz.x + sinf(transform.rotYZ) * yz.y;
-    modelPos.z = -sinf(transform.rotYZ) * yz.x + cosf(transform.rotYZ) * yz.y;
+    modelPos.y = cosf(transform->rotYZ) * yz.x + sinf(transform->rotYZ) * yz.y;
+    modelPos.z = -sinf(transform->rotYZ) * yz.x + cosf(transform->rotYZ) * yz.y;
 
-    Vector3D ret = {modelPos.x - transform.origin.x,
-                    modelPos.y - transform.origin.y,
-                    modelPos.z - transform.origin.z};
+    Vector3D ret = {modelPos.x - transform->origin.x,
+                    modelPos.y - transform->origin.y,
+                    modelPos.z - transform->origin.z};
     return ret;
 }
 
@@ -362,14 +400,9 @@ Vector3D project(Vector3D p, const float screenZ)
 
 void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, SurfaceAttributes attribs, SceneAttributes scene)
 {
-
-    A = getViewPos(A, scene.camera);
-    B = getViewPos(B, scene.camera);
-    C = getViewPos(C, scene.camera);
-
-    Vector3D Ap = project(A, scene.camera.focalLength);
-    Vector3D Bp = project(B, scene.camera.focalLength);
-    Vector3D Cp = project(C, scene.camera.focalLength);
+    Vector3D Ap = vertexShader(A, scene.camera);
+    Vector3D Bp = vertexShader(B, scene.camera);
+    Vector3D Cp = vertexShader(C, scene.camera);
 
     Vector2D a = {Ap.x * buffer.width, Ap.y * buffer.height};
     Vector2D b = {Bp.x * buffer.width, Bp.y * buffer.height};
