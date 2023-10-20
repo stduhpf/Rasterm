@@ -78,6 +78,11 @@ void usleep(__int64 usec)
 #include "printImg.h"
 #include "parseObj.c"
 
+#ifdef TEXTURED
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#endif
+
 void chessboardShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
 {
     float illumination = 1.;
@@ -103,7 +108,7 @@ void gouraudFragmentShader(float bufferColor[4], int x, int y, Vector2D uv, floa
         uv.x * attribs.normalA.z + uv.y * attribs.normalB.z + w * attribs.normalC.z};
 
     float normalLength = dot(attribs.normal, attribs.normal);
-    if (dot(attribs.normal, attribs.normal) > 0.)
+    if (normalLength > 0.)
     {
         SCALE_VEC3(normal, 1. / sqrtf(normalLength));
         illumination = MAX(0., dot(normal, scene.lightVector)) + .05 * MAX(0., -normal.y);
@@ -120,13 +125,46 @@ void debugUVs(float bufferColor[4], int x, int y, Vector2D uv, float inverseDept
 
     float w = (1. - uv.x - uv.y);
     Vector2D texture_uv = (Vector2D){
-        (uv.x * attribs.uvA.x + uv.y * attribs.uvB.x + w * attribs.uvC.x)*.5,
-        (uv.x * attribs.uvA.y + uv.y * attribs.uvB.y + w * attribs.uvC.y)*.5};
+        (uv.x * attribs.uvA.x + uv.y * attribs.uvB.x + w * attribs.uvC.x),
+        (uv.x * attribs.uvA.y + uv.y * attribs.uvB.y + w * attribs.uvC.y)};
 
     float normalLength = dot(attribs.normal, attribs.normal);
     bufferColor[0] = texture_uv.x;
     bufferColor[1] = texture_uv.y;
     bufferColor[2] = 0;
+    bufferColor[3] = inverseDepth;
+}
+
+int img_width = 0;
+int img_height = 0;
+unsigned char *texture = NULL;
+void texturedGouraudShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
+{
+    float illumination = 1.;
+
+    float w = (1. - uv.x - uv.y);
+    Vector2D texture_uv = (Vector2D){
+        (uv.x * attribs.uvA.x + uv.y * attribs.uvB.x + w * attribs.uvC.x),
+        (uv.x * attribs.uvA.y + uv.y * attribs.uvB.y + w * attribs.uvC.y)};
+    int X = (int)(texture_uv.x * img_width) % img_width;
+    int Y = (int)(texture_uv.y * img_height) % img_height;
+    unsigned char *data = texture + 4 * (X + Y * img_width);
+
+    Vector3D normal = (Vector3D){
+        uv.x * attribs.normalA.x + uv.y * attribs.normalB.x + w * attribs.normalC.x,
+        uv.x * attribs.normalA.y + uv.y * attribs.normalB.y + w * attribs.normalC.y,
+        uv.x * attribs.normalA.z + uv.y * attribs.normalB.z + w * attribs.normalC.z};
+
+    float normalLength = dot(attribs.normal, attribs.normal);
+    if (normalLength > 0.)
+    {
+        SCALE_VEC3(normal, 1. / sqrtf(normalLength));
+        illumination = MAX(0., dot(normal, scene.lightVector)) + .05 * MAX(0., -normal.y);
+    }
+
+    bufferColor[0] = (illumination * scene.direct.x + scene.ambient.x) * ((float)*(data)) / 255.;
+    bufferColor[1] = (illumination * scene.direct.y + scene.ambient.y) * ((float)*(data + 1)) / 255.;
+    bufferColor[2] = (illumination * scene.direct.z + scene.ambient.z) * ((float)*(data + 2)) / 255.;
     bufferColor[3] = inverseDepth;
 }
 
@@ -167,8 +205,13 @@ void from_obj(float *buffer, int t)
     {
         if (objLoaded)
         {
-            // printf("%d faces\n", faceCount);
+// printf("%d faces\n", faceCount);
+#ifdef TEXTURED
+            attachFragmentShader(&texturedGouraudShader);
+#else
             attachFragmentShader(&gouraudFragmentShader);
+#endif
+
             // attachFragmentShader(&debugUVs);
             for (int f = 0; f < faceCount; f++)
             {
@@ -266,7 +309,7 @@ void from_obj(float *buffer, int t)
         Vector3D C = (Vector3D){-4, 0, -4};
 
         SurfaceAttributes attributes = {0};
-        attributes.color = (Vector3D){.6, .5, .1};
+        attributes.color = (Vector3D){.6, .5, .45};
         attributes.normal.y = attributes.normalA.y = attributes.normalB.y = attributes.normalC.y = 1;
         triangle3D(fBuffer, A, B, C, attributes, scene);
 #ifdef STEP_RENDER
@@ -320,6 +363,10 @@ void clearBuffer(Framebuffer buffer)
 
 void loadObj()
 {
+    #ifdef TEXTURED
+    char *filename = "texture1.png";
+    texture = stbi_load(filename, &img_width, &img_height, 0, 4);
+    #endif
     char *path = "teapot.obj";
     faceCount = 0;
     int vertexCount = 0, normalCount = 0, uvCount = 0;
@@ -343,6 +390,9 @@ void unloadObj()
     free(normals);
     free(faces);
     free(uvs);
+    #ifdef TEXTURED
+    stbi_image_free(texture);
+    #endif
 }
 
 #ifndef RENDER_GUI
