@@ -299,8 +299,9 @@ void triangle2D(Framebuffer buffer, Vector2D a, Vector2D b, Vector2D c, float iz
     if (yMax < 0 || yMin >= buffer.height)
         return;
 
-#pragma omp parallel for
-    for (int x = xMin; x <= xMax; x++)
+    int x;
+#pragma omp parallel for if((xMax-xMin) > 128)
+    for (x = xMin; x <= xMax; x++)
     {
         for (int y = yMin; y <= yMax; y++)
         {
