@@ -88,7 +88,7 @@ bool parseObjects(char *filename, Vector3D *vertices, Vector3D *normals, Face *f
     int vertexIndex = 0;
     int normalIndex = 0;
     int faceIndex = 0;
-    int uvindex = 0;
+    int uvIndex = 0;
     FILE *fptr;
 
     // Open a file in read mode
@@ -162,9 +162,9 @@ bool parseObjects(char *filename, Vector3D *vertices, Vector3D *normals, Face *f
                     numBuffer[c] = '\0';
                     coords[i] = atof(numBuffer);
                 }
-                // printf("UV %d\tu=%f\tv=%f\n", uvindex + 1, coords[0], coords[1]);
-                uvs[uvindex] = (Vector2D){coords[0], coords[1]};
-                uvindex++;
+                // printf("UV %d\tu=%f\tv=%f\n", uvIndex + 1, coords[0], coords[1]);
+                uvs[uvIndex] = (Vector2D){coords[0], coords[1]};
+                uvIndex++;
                 break;
             }
             case 'n':
