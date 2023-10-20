@@ -81,7 +81,7 @@ void usleep(__int64 usec)
 #ifdef TEXTURED
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#endif
+#endif //TEXTURED
 
 void chessboardShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
 {
@@ -180,7 +180,7 @@ void from_obj(float *buffer, int t)
 {
 #ifdef LOG_FPS
     clock_t begin = clock();
-#endif
+#endif // LOG_FPS
     Framebuffer fBuffer = {(float *)buffer, WIDTH, HEIGHT};
     const float cameraRotateSpeed = .01f;
     float cameraRotXZ = t * cameraRotateSpeed;
@@ -210,7 +210,7 @@ void from_obj(float *buffer, int t)
             attachFragmentShader(&texturedGouraudShader);
 #else
             attachFragmentShader(&gouraudFragmentShader);
-#endif
+#endif //TEXTURED
 
             // attachFragmentShader(&debugUVs);
             for (int f = 0; f < faceCount; f++)
@@ -221,9 +221,8 @@ void from_obj(float *buffer, int t)
 
                 Vector3D normal = getNormal(A, B, C);
 
-                A = getWorldPos(A, potTransform);
-                B = getWorldPos(B, potTransform);
-                C = getWorldPos(C, potTransform);
+                attachModelTransform(&potTransform);
+
                 SurfaceAttributes attributes = (SurfaceAttributes){
                     (Vector3D){1, .5, .5},
                     normal,
@@ -248,9 +247,7 @@ void from_obj(float *buffer, int t)
                 Vector3D B = (Vector3D){vertices_pot[faces_pot[f][1]][0], vertices_pot[faces_pot[f][1]][1], vertices_pot[faces_pot[f][1]][2]};
                 Vector3D C = (Vector3D){vertices_pot[faces_pot[f][2]][0], vertices_pot[faces_pot[f][2]][1], vertices_pot[faces_pot[f][2]][2]};
 
-                A = getWorldPos(A, potTransform);
-                B = getWorldPos(B, potTransform);
-                C = getWorldPos(C, potTransform);
+                attachModelTransform(&potTransform);
 
                 SurfaceAttributes attributes = {0};
                 attributes.color = (Vector3D){1, .5, .5};
@@ -281,9 +278,7 @@ void from_obj(float *buffer, int t)
             Vector3D B = (Vector3D){vertices_cup[faces_cup[f][1]][0], vertices_cup[faces_cup[f][1]][1], vertices_cup[faces_cup[f][1]][2]};
             Vector3D C = (Vector3D){vertices_cup[faces_cup[f][2]][0], vertices_cup[faces_cup[f][2]][1], vertices_cup[faces_cup[f][2]][2]};
 
-            A = getWorldPos(A, cupTransform);
-            B = getWorldPos(B, cupTransform);
-            C = getWorldPos(C, cupTransform);
+            attachModelTransform(&cupTransform);
 
             SurfaceAttributes attributes = {0};
             attributes.color = (Vector3D){1, 1, 1};
@@ -307,7 +302,7 @@ void from_obj(float *buffer, int t)
         Vector3D A = (Vector3D){-4, 0, 4};
         Vector3D B = (Vector3D){4, 0, -4};
         Vector3D C = (Vector3D){-4, 0, -4};
-
+        resetModelTransform();
         SurfaceAttributes attributes = {0};
         attributes.color = (Vector3D){.6, .5, .45};
         attributes.normal.y = attributes.normalA.y = attributes.normalB.y = attributes.normalC.y = 1;
@@ -363,10 +358,10 @@ void clearBuffer(Framebuffer buffer)
 
 void loadObj()
 {
-    #ifdef TEXTURED
+#ifdef TEXTURED
     char *filename = "texture1.png";
     texture = stbi_load(filename, &img_width, &img_height, 0, 4);
-    #endif
+#endif //TEXTURED
     char *path = "teapot.obj";
     faceCount = 0;
     int vertexCount = 0, normalCount = 0, uvCount = 0;
@@ -390,9 +385,9 @@ void unloadObj()
     free(normals);
     free(faces);
     free(uvs);
-    #ifdef TEXTURED
+#ifdef TEXTURED
     stbi_image_free(texture);
-    #endif
+#endif //TEXTURED
 }
 
 #ifndef RENDER_GUI
