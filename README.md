@@ -40,19 +40,22 @@ By default, it produces images like this:
 
 ### Graphics engine: (rasterm.h)
 
-- `HEIGHT=[int]` : change size of canvas (default value:64)
-- `PX_ASPECT=[float]` : to adapt to the "aspect ratio" of the display's pixels (default 2.21 for terminal font) (controls the width indirectly)
-- `ASPECT_RATIO=[float]` : changes the aspect ratio of the render (controls the width indirectly)
-- `WIDTH=[int]`: I advise not using this one, you should rather use `ASPECT_RATIO="(float)[int]/HEIGHT"`, or you will have to deal with the pixel aspect ratio too
+- `ASPECT_RATIO=[float]` : changes the aspect ratio of the render (controls the width indirectly, TODO: move iot to renderer)
 - `FAST_MATH`: use fast inverse square root algorithm (might not be actually faster on modern hardware)
 - `PERSPECTIVE_UV` enables perspective-corrected uv mapping on 3D triangles (enabled by default in main.c)
 
 ### Renderer: (main.c)
 
+- `HEIGHT=[int]` : change size of canvas (default value:64)
+- `PX_ASPECT=[float]` : to adapt to the "aspect ratio" of the display's pixels (default 2.21 for terminal font) (controls the width indirectly)
+- `WIDTH=[int]`: I advise not using this one, you should rather use `ASPECT_RATIO="(float)[int]/HEIGHT"`, or you will have to deal with the pixel aspect ratio too
 - `FRAMES=[n]` : Draws n consecutive animated frames (recommended) (default: 1, ignored when using RENDER_TARGET=GDI)
 - `RENDER_TARGET=[GRAYSCALE|COLOR|FULL_COLOR|GDI(WINDOWS ONLY)]`: Change output mode (default: GRAYSCALE) (when using gdi, please link with gdi32)
 - `STEP_RENDER` : Refreshes the display after each triangle drawn on canvas (looks cool, but is very slow)
 - `FPS` (GDI only): number of frames to be displayed per second. (defaults to 60)
+- `TEXTURED`: display the teapot uv-mapped with `./texture1.png`.
+- `SHADOWMAP_DEMO`: renders a shadowmap, and add shadows to the table 
+- `SHADOW_RES=[int]`: resolution of the shadowmap (square) (defaults to 256)
 
 ### Display lib: (printImg.h)
 
