@@ -1,5 +1,5 @@
-#ifndef RASTERM
-#define RASTERM
+#ifndef RASTERM_H
+#define RASTERM_H
 
 #ifndef ASPECT_RATIO
 #define ASPECT_RATIO 1
@@ -161,12 +161,15 @@ void resetModelTransform();
         6: triangle3D(frameBuffer, A, B, C, surfaceAttributes, sceneAttributes)
  8: display the contents of the frameBuffer
 */
+#endif // RASTERM_H
 
 /*###################################################################################################*/
 
 // #define RASTERM_IMPLEMENTATION
 
 #ifdef RASTERM_IMPLEMENTATION
+#ifndef RASTERM_IMPLEMENTED
+#define RASTERM_IMPLEMENTED
 #include <math.h>
 
 ModelTransform *modelTransform = (ModelTransform *)NULL;
@@ -458,5 +461,5 @@ void triangle3D(FrameBuffer buffer, Vector3D A, Vector3D B, Vector3D C, SurfaceA
     triangle2D(buffer, a, b, c, Ap.z, Bp.z, Cp.z, attribs, scene);
 }
 
+#endif // RASTERM_IMPLEMENTED
 #endif // RASTERM_IMPLEMENTATION
-#endif // RASTERM
