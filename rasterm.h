@@ -29,6 +29,9 @@ typedef struct
 typedef struct
 {
     Vector3D color;
+    Vector3D A;
+    Vector3D B;
+    Vector3D C;
     Vector3D normal;
     Vector3D normalA;
     Vector3D normalB;
