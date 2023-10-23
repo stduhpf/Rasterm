@@ -1,6 +1,7 @@
 #ifndef RASTERM_H
 #define RASTERM_H
 
+// TODO: abstract this out
 #ifndef ASPECT_RATIO
 #define ASPECT_RATIO 1
 #endif // ASPECT_RATIO
