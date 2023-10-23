@@ -40,6 +40,7 @@ By default, it produces images like this:
 
 ### Graphics engine: (rasterm.h)
 
+- `RASTERM_IMPLEMENTATION` : turns the header into a source file
 - `ASPECT_RATIO=[float]` : changes the aspect ratio of the render (controls the width indirectly, TODO: move iot to renderer)
 - `FAST_MATH`: use fast inverse square root algorithm (might not be actually faster on modern hardware)
 - `PERSPECTIVE_UV` enables perspective-corrected uv mapping on 3D triangles (enabled by default in main.c)
