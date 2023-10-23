@@ -265,6 +265,7 @@ void from_obj(float *buffer, int t)
             attachFragmentShader(&gouraudFragmentShader);
 #endif // TEXTURED
 
+            attachModelTransform(&potTransform);
             // attachFragmentShader(&debugUVs);
             for (int f = 0; f < faceCount; f++)
             {
@@ -274,7 +275,6 @@ void from_obj(float *buffer, int t)
 
                 Vector3D normal = getNormal(A, B, C);
 
-                attachModelTransform(&potTransform);
 
                 SurfaceAttributes attributes = (SurfaceAttributes){
                     (Vector3D){1, .5, .5},
@@ -295,6 +295,7 @@ void from_obj(float *buffer, int t)
         }
         else
         {
+            attachModelTransform(&potTransform);
             for (int f = 0; f < faces_count_pot; f++)
             {
 
@@ -302,7 +303,6 @@ void from_obj(float *buffer, int t)
                 Vector3D B = (Vector3D){vertices_pot[faces_pot[f][1]][0], vertices_pot[faces_pot[f][1]][1], vertices_pot[faces_pot[f][1]][2]};
                 Vector3D C = (Vector3D){vertices_pot[faces_pot[f][2]][0], vertices_pot[faces_pot[f][2]][1], vertices_pot[faces_pot[f][2]][2]};
 
-                attachModelTransform(&potTransform);
 
                 SurfaceAttributes attributes = {0};
                 attributes.color = (Vector3D){1, .5, .5};
@@ -325,6 +325,7 @@ void from_obj(float *buffer, int t)
                                        0.5,
                                        0.0,
                                        (Vector3D){-1, -1, -1}};
+        attachModelTransform(&cupTransform);
         for (int f = 0; f < faces_count_cup; f++)
         {
 
@@ -333,7 +334,6 @@ void from_obj(float *buffer, int t)
             Vector3D B = (Vector3D){vertices_cup[faces_cup[f][1]][0], vertices_cup[faces_cup[f][1]][1], vertices_cup[faces_cup[f][1]][2]};
             Vector3D C = (Vector3D){vertices_cup[faces_cup[f][2]][0], vertices_cup[faces_cup[f][2]][1], vertices_cup[faces_cup[f][2]][2]};
 
-            attachModelTransform(&cupTransform);
 
             SurfaceAttributes attributes = {0};
             attributes.color = (Vector3D){1, 1, 1};

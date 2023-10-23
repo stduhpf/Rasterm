@@ -86,7 +86,7 @@ typedef void (*FragmentShader)(float bufferColor[4], int x, int y, Vector2D uv, 
  * Its inputs are:
  * `Vector3D Vertex`: the current vertex
  * `Camera camera`: The settings for the projection.
- * Additionally, calling `attachModelTransform(ModelTransform *mt)` 
+ * Additionally, calling `attachModelTransform(ModelTransform *mt)`
  * before rendering a model will affect the output of the vertex shader
  * by applying an additional transformation to the Vertex coordinates before the projection
  * @returns the projected vertex in screen space (Vector3D)
@@ -147,7 +147,25 @@ void attachModelTransform(ModelTransform *mt);
 /* Reset the model transform to the default (no transform) */
 void resetModelTransform();
 
+/*###################################################################################################*/
+
+/* Example pipeline
+ 0: Allocate FrameBuffer
+ 1: Setup SceneAttributes and Camera
+ For each model:
+    2: Create ModelTransform and attachModelTransform(&modelTransform) (optional)
+    3: attachFragmentShader(&customFragmentShader) (optional, but recommended)
+    4: attachVertexShader(&customVertexShader) (optional, unlikely to be needed)
+    For each triangle of the model:
+        5: Setup SurfaceAttributes
+        6: triangle3D(frameBuffer, A, B, C, surfaceAttributes, sceneAttributes)
+ 8: display the contents of the frameBuffer
+*/
+
+/*###################################################################################################*/
+
 // #define RASTERM_IMPLEMENTATION
+
 #ifdef RASTERM_IMPLEMENTATION
 
 ModelTransform *modelTransform = (ModelTransform *)NULL;
