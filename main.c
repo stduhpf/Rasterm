@@ -183,7 +183,7 @@ void depthOnlyShader(float bufferColor[4], int x, int y, Vector2D uv, float inve
 #define SHADOW_RES 256
 #endif // SHADOW_RES
 float *shadowBuffer;
-void hardShadowShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
+void hardShadowChessboardShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
 {
     float w = (1. - uv.x - uv.y);
 
@@ -354,7 +354,7 @@ void from_obj(float *buffer, int t)
     }
     {
 #ifdef SHADOWMAP_DEMO
-        attachFragmentShader(&hardShadowShader);
+        attachFragmentShader(&hardShadowChessboardShader);
 #else
         attachFragmentShader(&chessboardShader);
 #endif
