@@ -187,7 +187,7 @@ void hardShadowChessboardShader(float bufferColor[4], int x, int y, Vector2D uv,
 {
     float w = (1. - uv.x - uv.y);
 
-    Framebuffer shadowfBuffer = (Framebuffer){(float *)shadowBuffer, SHADOW_RES, SHADOW_RES};
+    FrameBuffer shadowfBuffer = (FrameBuffer){(float *)shadowBuffer, SHADOW_RES, SHADOW_RES};
     float cameraRotXZ = 0;
     float cameraRotYZ = -1.4219;
     const float cameraDistance = 1500;
@@ -204,7 +204,7 @@ void hardShadowChessboardShader(float bufferColor[4], int x, int y, Vector2D uv,
     if (Pp.x < 0 || Pp.y < 0 || Pp.x > 1 || Pp.y > 1)
         sz = Pp.z;
     else
-        sz = framebufferAt(shadowfBuffer, (size_t)(Pp.x * SHADOW_RES), (size_t)(Pp.y * SHADOW_RES))[3];
+        sz = frameBufferAt(shadowfBuffer, (size_t)(Pp.x * SHADOW_RES), (size_t)(Pp.y * SHADOW_RES))[3];
 
     float illumination = 1.;
     if (dot(attribs.normal, attribs.normal) > 0.)
@@ -236,7 +236,7 @@ void from_obj(float *buffer, int t)
 #ifdef LOG_FPS
     clock_t begin = clock();
 #endif // LOG_FPS
-    Framebuffer fBuffer = {(float *)buffer, WIDTH, HEIGHT};
+    FrameBuffer fBuffer = {(float *)buffer, WIDTH, HEIGHT};
     const float cameraRotateSpeed = .01f;
     float cameraRotXZ = t * cameraRotateSpeed;
     float cameraRotYZ = -0.5;
@@ -406,7 +406,7 @@ void print(float buffer[WIDTH][HEIGHT][4])
 void shadowPass(int t)
 {
     attachFragmentShader(&depthOnlyShader);
-    Framebuffer fBuffer = {(float *)shadowBuffer, SHADOW_RES, SHADOW_RES};
+    FrameBuffer fBuffer = {(float *)shadowBuffer, SHADOW_RES, SHADOW_RES};
     float cameraRotXZ = 0;
     float cameraRotYZ = -1.4219;
     const float cameraDistance = 1500;
@@ -535,14 +535,14 @@ void shadowPass(int t)
 }
 #endif // SHADOWMAP_DEMO
 
-void clearBuffer(Framebuffer buffer)
+void clearBuffer(FrameBuffer buffer)
 {
     // #pragma omp parallel for
     for (int i = 0; i < buffer.width; i++)
     {
         for (int j = 0; j < buffer.height; j++)
         {
-            float *fragment = framebufferAt(buffer, i, j);
+            float *fragment = frameBufferAt(buffer, i, j);
             fragment[0] = 0;
             fragment[1] = 0;
             fragment[2] = 0;
@@ -601,7 +601,7 @@ int main()
     float *buffer = malloc(sizeof(float[WIDTH][HEIGHT][4]));
 #else
     float buffer[WIDTH][HEIGHT][4];
-    clearBuffer((Framebuffer){buffer, WIDTH, HEIGHT});
+    clearBuffer((FrameBuffer){buffer, WIDTH, HEIGHT});
 #endif // DYNAMIC_ALLOC
     for (int t = 0; t < FRAMES; t++)
     {
@@ -613,7 +613,7 @@ int main()
         usleep(1000 * 1000 / 60);
         printf("\033[%zuA", (size_t)HEIGHT);
         printf("\033[%zuD", (size_t)WIDTH);
-        clearBuffer((Framebuffer){buffer, WIDTH, HEIGHT});
+        clearBuffer((FrameBuffer){buffer, WIDTH, HEIGHT});
     }
 #ifdef DYNAMIC_ALLOC
     free(buffer);
@@ -642,13 +642,13 @@ void CreateDIBAndCopyData(HDC hdc, HBITMAP *hBitmap, uint8_t **dibData)
     *hBitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, (void **)dibData, NULL, 0);
 // Copy data from your floating-point buffer to the DIB
 #ifndef DEBUG_SHADOWMAP
-    Framebuffer fBuffer = (Framebuffer){buffer, WIDTH, HEIGHT};
+    FrameBuffer fBuffer = (FrameBuffer){buffer, WIDTH, HEIGHT};
     for (int y = 0; y < HEIGHT; y++)
     {
         for (int x = 0; x < WIDTH; x++)
         {
             uint8_t *pixel = *dibData + (y * WIDTH + x) * 4;
-            float *fragment = framebufferAt(fBuffer, x, y);
+            float *fragment = frameBufferAt(fBuffer, x, y);
             float r = sqrtf(fragment[0]);
             float g = sqrtf(fragment[1]);
             float b = sqrtf(fragment[2]);
@@ -661,13 +661,13 @@ void CreateDIBAndCopyData(HDC hdc, HBITMAP *hBitmap, uint8_t **dibData)
         }
     }
 #else
-    Framebuffer shadowfBuffer = (Framebuffer){shadowBuffer, SHADOW_RES, SHADOW_RES};
+    FrameBuffer shadowfBuffer = (FrameBuffer){shadowBuffer, SHADOW_RES, SHADOW_RES};
     for (int y = 0; y < HEIGHT; y++)
     {
         for (int x = 0; x < WIDTH; x++)
         {
             uint8_t *pixel = *dibData + (y * WIDTH + x) * 4;
-            float *fragment = framebufferAt(shadowfBuffer, x * SHADOW_RES / WIDTH, y * SHADOW_RES / HEIGHT);
+            float *fragment = frameBufferAt(shadowfBuffer, x * SHADOW_RES / WIDTH, y * SHADOW_RES / HEIGHT);
             float r = sqrtf(200. / (1. / fragment[0] - 1.));
             float g = sqrtf(200. / (1. / fragment[1] - 1.));
             float b = sqrtf(200. / (1. / fragment[2] - 1.));
@@ -727,7 +727,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_TIMER:
     {
         // Update the buffer for the current frame
-        clearBuffer((Framebuffer){buffer, WIDTH, HEIGHT});
+        clearBuffer((FrameBuffer){buffer, WIDTH, HEIGHT});
 #ifdef SHADOWMAP_DEMO
         // shadowPass(frame);
 #endif // SHADOWMAP_DEMO

@@ -1,6 +1,6 @@
 # Rasterized Toy Renderer
 
-A very simple software renderer using single-threaded CPU rasterization, and outputting result as ASCII art to stdout. All the rendering and display logic is in `main.c`, the 3D models are "transpiled" from wavefront object to C header files using code stolen from [olive.c](https://github.com/tsoding/olive.c/tree/master/tools), because I didn't want to lose time dealing with files.
+A very simple software renderer using single-threaded CPU rasterization, and outputting result as ASCII art to stdout. All the rendering and display logic is in `main.c`, some 3D models are "transpiled" from wavefront object to C header files using code stolen from [olive.c](https://github.com/tsoding/olive.c/tree/master/tools), because I didn't want to lose time dealing with files at the start of this project.
 This is just a toy project, don't expect good performance or usability.
 
 I got the idea to do such a project from [olive.c](https://github.com/tsoding/olive.c). Check it out!
@@ -89,11 +89,12 @@ To compile for GDI target on windows:
 
 The code is split in 3 parts:
 
-- **The renderer**: located in `main.c`
+- **The renderer**: located in `main.c`.
 - **The graphics engine** : located in `rasterm.h`. It is the core of this project.
 - **The terminal output library**: located in `printImg.h`. It is in charge of displaying the rendered images to the terminal.
+- **The Wavefront .obj parser**: located in `parseObj.c`.
 
 ### rasterm.h
 
-This is the important file of this repo.
+This is the most important file of this repo.
 It is a STB-style library that contains the necessary tools for rasterizing and shading 3D triangles to a 2D buffer.

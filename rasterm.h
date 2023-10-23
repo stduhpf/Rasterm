@@ -11,7 +11,7 @@ typedef struct
     float *data;
     size_t width;
     size_t height;
-} Framebuffer;
+} FrameBuffer;
 
 typedef struct
 {
@@ -57,6 +57,7 @@ typedef struct
     Camera camera;
 } SceneAttributes;
 
+// Modelises the transformation from Model space to World space
 typedef struct
 {
     Vector3D origin;
@@ -66,7 +67,30 @@ typedef struct
     Vector3D scale;
 } ModelTransform;
 
+/**
+ * The FragmentShader is called on each pixel of the frameBuffer containing the triangle getting drawn.
+ * It is in charge of setting the value of the pixel.
+ * Its inputs are:
+ * `float bufferColor[4]`: a pointer to the current pixel (format RGBA)
+ * `int x`, `int y` coordinates of the current pixel in frameBuffer (just in case)
+ * `Vector2D uv`: barycentric coordinates of the current pixel in the current triangle (p = uv.x*a + uv.y*b + (1-uv.x-uv.y)*c)
+ * `inverseDepth`: z-value of the triangle at this pixel. Proportionate to the inverse of the depth.
+ * `SurfaceAttributes attribs`: contains useful information about the current triangle
+ * `SceneAttributes scene`: contains information about the scene
+ * Expected behaviour: should set `bufferColor[3] = inverseDepth;` This is important because this value will be used for depth check against the other triangles.
+ * */
 typedef void (*FragmentShader)(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene);
+/**
+ * The VertexShader is called on each vertex of the triangle getting drawn.
+ * It is in charge of projecting the vertex from Model space to Screen space.
+ * Its inputs are:
+ * `Vector3D Vertex`: the current vertex
+ * `Camera camera`: The settings for the projection.
+ * Additionally, calling `attachModelTransform(ModelTransform *mt)` 
+ * before rendering a model will affect the output of the vertex shader
+ * by applying an additional transformation to the Vertex coordinates before the projection
+ * @returns the projected vertex in screen space (Vector3D)
+ * */
 typedef Vector3D (*VertexShader)(Vector3D Vertex, Camera camera);
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -78,8 +102,8 @@ typedef Vector3D (*VertexShader)(Vector3D Vertex, Camera camera);
         (v3).y *= (s);    \
         (v3).z *= (s);    \
     }
-
-float *framebufferAt(Framebuffer buffer, size_t i, size_t j);
+/* Get pointer to pixel from the FrameBuffer `buffer` at integer coordinates `i`, `j` */
+float *frameBufferAt(FrameBuffer buffer, size_t i, size_t j);
 
 float min4(float a, float b, float c, float d);
 float max4(float a, float b, float c, float d);
@@ -97,7 +121,7 @@ Vector2D barycentric(Vector2D p, Vector2D a, Vector2D b, Vector2D c);
  Also calls the currently enabled fragment shader to each pixel that passes the test  */
 void triangleShader(float bufferColor[4], int x, int y, Vector2D uv, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene);
 /* Rasterize 2D triangle abc onto the frame buffer, performing depth culling with the inverse z values of each vertex */
-void triangle2D(Framebuffer buffer, Vector2D a, Vector2D b, Vector2D c, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene);
+void triangle2D(FrameBuffer buffer, Vector2D a, Vector2D b, Vector2D c, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene);
 /* Converts points in model space to points in world space */
 Vector3D model2WorldTransform(Vector3D modelPos, ModelTransform *transform);
 /* Converts points in world space to points in view space */
@@ -109,7 +133,7 @@ Vector3D getNormal(Vector3D a, Vector3D b, Vector3D c);
 /* Converts from view space to screen space (x, y, inverse depth) */
 Vector3D project(Vector3D p, const float screenZ);
 /* Project and rasterize the 3D triangle ABC in the scene onto the frame buffer */
-void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, SurfaceAttributes attribs, SceneAttributes scene);
+void triangle3D(FrameBuffer buffer, Vector3D A, Vector3D B, Vector3D C, SurfaceAttributes attribs, SceneAttributes scene);
 /* Set the "vertex shader" that will be used on each vertex during the next call to triangle3D() */
 void attachVertexShader(VertexShader fs);
 /* Reset the vertex shader to the default simple shader */
@@ -123,7 +147,7 @@ void attachModelTransform(ModelTransform *mt);
 /* Reset the model transform to the default (no transform) */
 void resetModelTransform();
 
-#define RASTERM_IMPLEMENTATION
+// #define RASTERM_IMPLEMENTATION
 #ifdef RASTERM_IMPLEMENTATION
 
 ModelTransform *modelTransform = (ModelTransform *)NULL;
@@ -184,7 +208,7 @@ void resetVertexShader()
     vertexShader = &defaultVertexShader;
 }
 
-float *framebufferAt(Framebuffer buffer, size_t i, size_t j)
+float *frameBufferAt(FrameBuffer buffer, size_t i, size_t j)
 {
     return buffer.data + (i * buffer.height + j) * 4;
 }
@@ -287,7 +311,7 @@ void triangleShader(float bufferColor[4], int x, int y, Vector2D uv, float iza, 
     }
 }
 
-void triangle2D(Framebuffer buffer, Vector2D a, Vector2D b, Vector2D c, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene)
+void triangle2D(FrameBuffer buffer, Vector2D a, Vector2D b, Vector2D c, float iza, float izb, float izc, SurfaceAttributes attribs, SceneAttributes scene)
 {
     if (iza < 0. || izb < 0. || izc < 0.)
         return;
@@ -303,14 +327,14 @@ void triangle2D(Framebuffer buffer, Vector2D a, Vector2D b, Vector2D c, float iz
         return;
 
     int x;
-#pragma omp parallel for if((xMax-xMin) > 128)
+#pragma omp parallel for if ((xMax - xMin) > 128)
     for (x = xMin; x <= xMax; x++)
     {
         for (int y = yMin; y <= yMax; y++)
         {
             Vector2D p = {x, y};
             Vector2D uv = barycentric(p, a, b, c);
-            triangleShader(framebufferAt(buffer, x, y), x, y, uv, iza, izb, izc, attribs, scene);
+            triangleShader(frameBufferAt(buffer, x, y), x, y, uv, iza, izb, izc, attribs, scene);
         }
     }
 }
@@ -402,7 +426,7 @@ Vector3D project(Vector3D p, const float screenZ)
     return ret;
 }
 
-void triangle3D(Framebuffer buffer, Vector3D A, Vector3D B, Vector3D C, SurfaceAttributes attribs, SceneAttributes scene)
+void triangle3D(FrameBuffer buffer, Vector3D A, Vector3D B, Vector3D C, SurfaceAttributes attribs, SceneAttributes scene)
 {
     Vector3D Ap = vertexShader(A, scene.camera);
     Vector3D Bp = vertexShader(B, scene.camera);
