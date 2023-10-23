@@ -1,6 +1,9 @@
 *
 !*.*
 *.exe
+*.o
+*.a
+*.dll
 *.su
 **/.*
 !.gitignore
