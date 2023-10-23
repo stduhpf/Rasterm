@@ -2,9 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#ifndef RASTERM
 #include "rasterm.h"
-#endif // RASTERM
 
 typedef struct
 {
