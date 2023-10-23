@@ -167,6 +167,7 @@ void resetModelTransform();
 // #define RASTERM_IMPLEMENTATION
 
 #ifdef RASTERM_IMPLEMENTATION
+#include <math.h>
 
 ModelTransform *modelTransform = (ModelTransform *)NULL;
 void attachModelTransform(ModelTransform *mt)
