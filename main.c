@@ -83,6 +83,8 @@ void usleep(__int64 usec)
 #include "stb_image.h"
 #endif // TEXTURED
 
+// Shaders
+
 void chessboardShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
 {
     float illumination = 1.;
@@ -168,6 +170,59 @@ void texturedGouraudShader(float bufferColor[4], int x, int y, Vector2D uv, floa
     bufferColor[3] = inverseDepth;
 }
 
+void depthOnlyShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
+{
+    bufferColor[0] = inverseDepth;
+    bufferColor[1] = inverseDepth;
+    bufferColor[2] = inverseDepth;
+    bufferColor[3] = inverseDepth;
+}
+
+#ifdef SHADOWMAP_DEMO
+#ifndef SHADOW_RES
+#define SHADOW_RES 256
+#endif // SHADOW_RES
+float *shadowBuffer;
+void hardShadowShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
+{
+    float w = (1. - uv.x - uv.y);
+
+    Framebuffer shadowfBuffer = (Framebuffer){(float *)shadowBuffer, SHADOW_RES, SHADOW_RES};
+    float cameraRotXZ = 0;
+    float cameraRotYZ = -1.4219;
+    const float cameraDistance = 1500;
+    const Vector3D cameraPosition = {cameraDistance * sinf(cameraRotXZ), cameraDistance * sinf(cameraRotYZ), -cameraDistance * cosf(cameraRotXZ) * cos(cameraRotYZ)};
+    const float cameraFocalLength = 250.;
+    Camera shadowCamera = {cameraPosition, cameraRotXZ, cameraRotYZ, cameraFocalLength};
+
+    Vector3D P = {uv.x * attribs.A.x + uv.y * attribs.B.x + w * attribs.C.x,
+                  uv.x * attribs.A.y + uv.y * attribs.B.y + w * attribs.C.y,
+                  uv.x * attribs.A.z + uv.y * attribs.B.z + w * attribs.C.z};
+
+    Vector3D Pp = vertexShader(P, shadowCamera);
+    float sz;
+    if (Pp.x < 0 || Pp.y < 0 || Pp.x > 1 || Pp.y > 1)
+        sz = Pp.z;
+    else
+        sz = framebufferAt(shadowfBuffer, (size_t)(Pp.x * SHADOW_RES), (size_t)(Pp.y * SHADOW_RES))[3];
+
+    float illumination = 1.;
+    if (dot(attribs.normal, attribs.normal) > 0.)
+    {
+        illumination = MAX(0., dot(attribs.normal, scene.lightVector)) + .05 * MAX(0., -attribs.normal.y);
+    }
+    float texture = (fmodf((uv.x * 4.0f), 1.0f) > .5 ^ fmodf((uv.y * 4.0f), 1.0f) > .5) ? 1. : .01;
+    if (fabsf(sz - Pp.z) > .00001)
+        illumination = 0;
+
+    bufferColor[0] = (illumination * scene.direct.x + scene.ambient.x) * attribs.color.x * texture;
+    bufferColor[1] = (illumination * scene.direct.y + scene.ambient.y) * attribs.color.y * texture;
+    bufferColor[2] = (illumination * scene.direct.z + scene.ambient.z) * attribs.color.z * texture;
+    bufferColor[3] = inverseDepth;
+}
+#endif // SHADOWMAP_DEMO
+// global variables
+
 bool objLoaded = false;
 Vector3D *vertices = NULL;
 Vector3D *normals = NULL;
@@ -223,6 +278,9 @@ void from_obj(float *buffer, int t)
 
                 SurfaceAttributes attributes = (SurfaceAttributes){
                     (Vector3D){1, .5, .5},
+                    A,
+                    B,
+                    C,
                     normal,
                     normals[faces[f].An - 1],
                     normals[faces[f].Bn - 1],
@@ -248,6 +306,7 @@ void from_obj(float *buffer, int t)
 
                 SurfaceAttributes attributes = {0};
                 attributes.color = (Vector3D){1, .5, .5};
+                attributes.A = A, attributes.B = B, attributes.C = C;
                 attributes.normal = getNormal(A, B, C);
                 attributes.normalA = attributes.normal;
                 attributes.normalB = attributes.normal;
@@ -278,6 +337,7 @@ void from_obj(float *buffer, int t)
 
             SurfaceAttributes attributes = {0};
             attributes.color = (Vector3D){1, 1, 1};
+            attributes.A = A, attributes.B = B, attributes.C = C;
             attributes.normal = getNormal(A, B, C);
             // Fix normals (ideally this step should not be required, but whatever)
             attributes.normalA = attributes.normal;
@@ -293,7 +353,11 @@ void from_obj(float *buffer, int t)
         }
     }
     {
+#ifdef SHADOWMAP_DEMO
+        attachFragmentShader(&hardShadowShader);
+#else
         attachFragmentShader(&chessboardShader);
+#endif
         // floor
         Vector3D A = (Vector3D){-4, 0, 4};
         Vector3D B = (Vector3D){4, 0, -4};
@@ -301,6 +365,7 @@ void from_obj(float *buffer, int t)
         resetModelTransform();
         SurfaceAttributes attributes = {0};
         attributes.color = (Vector3D){.6, .5, .45};
+        attributes.A = A, attributes.B = B, attributes.C = C;
         attributes.normal.y = attributes.normalA.y = attributes.normalB.y = attributes.normalC.y = 1;
         triangle3D(fBuffer, A, B, C, attributes, scene);
 #ifdef STEP_RENDER
@@ -309,6 +374,7 @@ void from_obj(float *buffer, int t)
         print(buffer);
 #endif // STEP_RENDER
         C = (Vector3D){4, 0, 4};
+        attributes.C = C;
         triangle3D(fBuffer, A, B, C, attributes, scene);
         resetFragmentShader();
     }
@@ -336,6 +402,139 @@ void print(float buffer[WIDTH][HEIGHT][4])
 #endif // RENDER_TARGET
 }
 
+#ifdef SHADOWMAP_DEMO
+void shadowPass(int t)
+{
+    attachFragmentShader(&depthOnlyShader);
+    Framebuffer fBuffer = {(float *)shadowBuffer, SHADOW_RES, SHADOW_RES};
+    float cameraRotXZ = 0;
+    float cameraRotYZ = -1.4219;
+    const float cameraDistance = 1500;
+    Vector3D lightVec = normalize((Vector3D){0, 2, .3});
+    const Vector3D cameraPosition = {cameraDistance * sinf(cameraRotXZ), cameraDistance * sinf(cameraRotYZ), -cameraDistance * cosf(cameraRotXZ) * cos(cameraRotYZ)};
+    const float cameraFocalLength = 250.;
+
+    Camera camera = {cameraPosition, cameraRotXZ, cameraRotYZ, cameraFocalLength};
+
+    SceneAttributes scene = {lightVec, (Vector3D){0}, (Vector3D){0}, camera};
+
+    ModelTransform potTransform = {(Vector3D){-1, 2, 0},
+                                   0.1,
+                                   0.0,
+                                   0.4,
+                                   (Vector3D){-0.15, -0.15, -0.15}};
+    {
+        if (objLoaded)
+        {
+
+            for (int f = 0; f < faceCount; f++)
+            {
+                Vector3D A = vertices[faces[f].A - 1];
+                Vector3D B = vertices[faces[f].B - 1];
+                Vector3D C = vertices[faces[f].C - 1];
+
+                Vector3D normal = getNormal(A, B, C);
+
+                attachModelTransform(&potTransform);
+
+                SurfaceAttributes attributes = (SurfaceAttributes){
+                    (Vector3D){1, .5, .5},
+                    A,
+                    B,
+                    C,
+                    normal,
+                    normals[faces[f].An - 1],
+                    normals[faces[f].Bn - 1],
+                    normals[faces[f].Cn - 1],
+                    uvs[faces[f].Auv - 1],
+                    uvs[faces[f].Buv - 1],
+                    uvs[faces[f].Cuv - 1],
+                };
+                triangle3D(fBuffer, A, B, C, attributes, scene);
+            }
+        }
+        else
+        {
+            for (int f = 0; f < faces_count_pot; f++)
+            {
+
+                Vector3D A = (Vector3D){vertices_pot[faces_pot[f][0]][0], vertices_pot[faces_pot[f][0]][1], vertices_pot[faces_pot[f][0]][2]};
+                Vector3D B = (Vector3D){vertices_pot[faces_pot[f][1]][0], vertices_pot[faces_pot[f][1]][1], vertices_pot[faces_pot[f][1]][2]};
+                Vector3D C = (Vector3D){vertices_pot[faces_pot[f][2]][0], vertices_pot[faces_pot[f][2]][1], vertices_pot[faces_pot[f][2]][2]};
+
+                attachModelTransform(&potTransform);
+
+                SurfaceAttributes attributes = {0};
+                attributes.color = (Vector3D){1, .5, .5};
+                attributes.A = A, attributes.B = B, attributes.C = C;
+                attributes.normal = getNormal(A, B, C);
+                attributes.normalA = attributes.normal;
+                attributes.normalB = attributes.normal;
+                attributes.normalC = attributes.normal;
+                triangle3D(fBuffer, A, B, C, attributes, scene);
+
+#ifdef STEP_RENDER
+                printf("\033[%zuA", (size_t)HEIGHT);
+                printf("\033[%zuD", (size_t)WIDTH);
+                print(buffer);
+#endif // STEP_RENDER
+            }
+        }
+        ModelTransform cupTransform = {(Vector3D){2, .5, 0},
+                                       0.0,
+                                       0.5,
+                                       0.0,
+                                       (Vector3D){-1, -1, -1}};
+        for (int f = 0; f < faces_count_cup; f++)
+        {
+
+            // normals are broken because of inconsistent vertex order
+            Vector3D A = (Vector3D){vertices_cup[faces_cup[f][0]][0], vertices_cup[faces_cup[f][0]][1], vertices_cup[faces_cup[f][0]][2]};
+            Vector3D B = (Vector3D){vertices_cup[faces_cup[f][1]][0], vertices_cup[faces_cup[f][1]][1], vertices_cup[faces_cup[f][1]][2]};
+            Vector3D C = (Vector3D){vertices_cup[faces_cup[f][2]][0], vertices_cup[faces_cup[f][2]][1], vertices_cup[faces_cup[f][2]][2]};
+
+            attachModelTransform(&cupTransform);
+
+            SurfaceAttributes attributes = {0};
+            attributes.color = (Vector3D){1, 1, 1};
+            attributes.A = A, attributes.B = B, attributes.C = C;
+            attributes.normal = getNormal(A, B, C);
+            // Fix normals (ideally this step should not be required, but whatever)
+            attributes.normalA = attributes.normal;
+            attributes.normalB = attributes.normal;
+            attributes.normalC = attributes.normal;
+            triangle3D(fBuffer, A, B, C, attributes, scene);
+
+#ifdef STEP_RENDER
+            printf("\033[%zuA", (size_t)HEIGHT);
+            printf("\033[%zuD", (size_t)WIDTH);
+            print(buffer);
+#endif // STEP_RENDER
+        }
+    }
+    {
+        // floor
+        Vector3D A = (Vector3D){-4, 0, 4};
+        Vector3D B = (Vector3D){4, 0, -4};
+        Vector3D C = (Vector3D){-4, 0, -4};
+        resetModelTransform();
+        SurfaceAttributes attributes = {0};
+        attributes.color = (Vector3D){.6, .5, .45};
+        attributes.A = A, attributes.B = B, attributes.C = C;
+        attributes.normal.y = attributes.normalA.y = attributes.normalB.y = attributes.normalC.y = 1;
+        triangle3D(fBuffer, A, B, C, attributes, scene);
+#ifdef STEP_RENDER
+        printf("\033[%zuA", (size_t)HEIGHT);
+        printf("\033[%zuD", (size_t)WIDTH);
+        print(buffer);
+#endif // STEP_RENDER
+        C = (Vector3D){4, 0, 4};
+        attributes.C = C;
+        triangle3D(fBuffer, A, B, C, attributes, scene);
+    }
+}
+#endif // SHADOWMAP_DEMO
+
 void clearBuffer(Framebuffer buffer)
 {
     // #pragma omp parallel for
@@ -354,6 +553,10 @@ void clearBuffer(Framebuffer buffer)
 
 void loadObj()
 {
+#ifdef SHADOWMAP_DEMO
+    shadowBuffer = malloc(sizeof(float[SHADOW_RES][SHADOW_RES][4]));
+#endif // SHADOWMAP_DEMO
+
 #ifdef TEXTURED
     char *filename = "texture1.png";
     texture = stbi_load(filename, &img_width, &img_height, 0, 4);
@@ -384,6 +587,10 @@ void unloadObj()
 #ifdef TEXTURED
     stbi_image_free(texture);
 #endif // TEXTURED
+
+#ifdef SHADOWMAP_DEMO
+    free(shadowBuffer);
+#endif // SHADOWMAP_DEMO
 }
 
 #ifndef RENDER_GUI
@@ -396,9 +603,11 @@ int main()
     float buffer[WIDTH][HEIGHT][4];
     clearBuffer((Framebuffer){buffer, WIDTH, HEIGHT});
 #endif // DYNAMIC_ALLOC
-
     for (int t = 0; t < FRAMES; t++)
     {
+#ifdef SHADOWMAP_DEMO
+        shadowPass(t);
+#endif // SHADOWMAP_DEMO
         from_obj(buffer, t);
         print(buffer);
         usleep(1000 * 1000 / 60);
@@ -419,7 +628,6 @@ float *buffer;
 
 void CreateDIBAndCopyData(HDC hdc, HBITMAP *hBitmap, uint8_t **dibData)
 {
-    Framebuffer fBuffer = (Framebuffer){buffer, WIDTH, HEIGHT};
     // Create a BITMAPINFO structure for the DIB
     BITMAPINFO bmi;
     ZeroMemory(&bmi, sizeof(BITMAPINFO));
@@ -432,7 +640,9 @@ void CreateDIBAndCopyData(HDC hdc, HBITMAP *hBitmap, uint8_t **dibData)
 
     // Create a DIB section
     *hBitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, (void **)dibData, NULL, 0);
-    // Copy data from your floating-point buffer to the DIB
+// Copy data from your floating-point buffer to the DIB
+#ifndef DEBUG_SHADOWMAP
+    Framebuffer fBuffer = (Framebuffer){buffer, WIDTH, HEIGHT};
     for (int y = 0; y < HEIGHT; y++)
     {
         for (int x = 0; x < WIDTH; x++)
@@ -450,6 +660,26 @@ void CreateDIBAndCopyData(HDC hdc, HBITMAP *hBitmap, uint8_t **dibData)
             pixel[3] = (uint8_t)(a * 255); // Alpha
         }
     }
+#else
+    Framebuffer shadowfBuffer = (Framebuffer){shadowBuffer, SHADOW_RES, SHADOW_RES};
+    for (int y = 0; y < HEIGHT; y++)
+    {
+        for (int x = 0; x < WIDTH; x++)
+        {
+            uint8_t *pixel = *dibData + (y * WIDTH + x) * 4;
+            float *fragment = framebufferAt(shadowfBuffer, x * SHADOW_RES / WIDTH, y * SHADOW_RES / HEIGHT);
+            float r = sqrtf(200. / (1. / fragment[0] - 1.));
+            float g = sqrtf(200. / (1. / fragment[1] - 1.));
+            float b = sqrtf(200. / (1. / fragment[2] - 1.));
+            float a = fragment[3];
+
+            pixel[0] = (uint8_t)(b * 255); // Blue
+            pixel[1] = (uint8_t)(g * 255); // Green
+            pixel[2] = (uint8_t)(r * 255); // Red
+            pixel[3] = (uint8_t)(a * 255); // Alpha
+        }
+    }
+#endif // DEBUG_SHADOWMAP
 }
 
 void PaintWindow(HWND hwnd)
@@ -498,6 +728,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         // Update the buffer for the current frame
         clearBuffer((Framebuffer){buffer, WIDTH, HEIGHT});
+#ifdef SHADOWMAP_DEMO
+        // shadowPass(frame);
+#endif // SHADOWMAP_DEMO
         from_obj(buffer, ++frame);
 
         // Repaint the window to display the updated frame
@@ -519,6 +752,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 {
     loadObj();
     buffer = malloc(sizeof(float[WIDTH][HEIGHT][4]));
+#ifdef SHADOWMAP_DEMO
+    shadowPass(0);
+#endif // SHADOWMAP_DEMO
+
     from_obj(buffer, 0);
     // Register the window class
     WNDCLASSEX wc = {sizeof(WNDCLASSEX), CS_CLASSDC, WindowProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, ("YourWindowClass"), NULL};
