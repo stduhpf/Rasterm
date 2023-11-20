@@ -238,6 +238,7 @@ bool voxelIntersect(Vector3D *A, Vector3D *B, Vector3D *C, Vector3D vMin, Vector
 float minstep;
 
 // TODO: fix that shit
+// Somehow it works ok with positive rd, but breaks for negative? (I think?)
 Vector3D voxelSkipLOD(Vector3D p, Vector3D rd, int depth, Octree octree)
 {
     // ray offsets
