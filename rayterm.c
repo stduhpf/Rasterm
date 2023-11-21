@@ -78,28 +78,28 @@ void octreeCoords(Vector3D worldCoords, int *x, int *y, int *z, Octree bb)
     *y = (int)((float)octree_span * (worldCoords.y - bb.world_offset.y) / bb.world_size.y);
     *z = (int)((float)octree_span * (worldCoords.z - bb.world_offset.z) / bb.world_size.z);
 }
-void octreeCoordsDepth(Vector3D worldCoords, int *x, int *y, int *z, Octree bb, int depth)
+void octreeCoordsLod(Vector3D worldCoords, int *x, int *y, int *z, Octree bb, int lod)
 {
     octreeCoords(worldCoords, x, y, z, bb);
-    *x >>= depth;
-    *y >>= depth;
-    *z >>= depth;
+    *x >>= lod;
+    *y >>= lod;
+    *z >>= lod;
 }
 
 Vector3D voxelOrig(int x, int y, int z, Octree bb)
 {
-    return (Vector3D){bb.world_offset.x + (float)x * bb.world_size.x / (float)octree_span,
-                      bb.world_offset.y + (float)y * bb.world_size.y / (float)octree_span,
-                      bb.world_offset.z + (float)z * bb.world_size.z / (float)octree_span};
+    return (Vector3D){bb.world_offset.x + ((float)x) * bb.world_size.x / (float)octree_span,
+                      bb.world_offset.y + ((float)y) * bb.world_size.y / (float)octree_span,
+                      bb.world_offset.z + ((float)z) * bb.world_size.z / (float)octree_span};
 }
-
-Vector3D voxelOrigDepth(int x, int y, int z, Octree bb, int depth)
+Vector3D voxelOrigLod(int x, int y, int z, Octree bb, int lod)
 {
-    x <<= depth;
-    y <<= depth;
-    z <<= depth;
+    x <<= lod;
+    y <<= lod;
+    z <<= lod;
     return voxelOrig(x, y, z, bb);
 }
+
 /**
  * @brief Checks if an arbitrary 2D segment intersects an other segment aligned with the y axis
  *
@@ -236,17 +236,18 @@ bool voxelIntersect(Vector3D *A, Vector3D *B, Vector3D *C, Vector3D vMin, Vector
 }
 
 float minstep;
+float maxstep;
 
-// TODO: fix that shit
-// Somehow it works ok with positive rd, but breaks for negative? (I think?)
-Vector3D voxelSkipLOD(Vector3D p, Vector3D rd, int depth, Octree octree)
+// TODO: fix that shit (see dubug.glsl:should work???)
+// Why the hell would it work perfectly in 2D shader, but not 3D C???
+Vector3D voxelSkipLOD(Vector3D p, Vector3D rd, int lod, Octree octree)
 {
     // ray offsets
-    int sx = (rd.x >= 0 ? 1 : 0), sy = (rd.y >= 0 ? 1 : 0), sz = (rd.z >= 0 ? 1 : 0);
+    int sx = (rd.x > 0 ? 1 : 0), sy = (rd.y > 0 ? 1 : 0), sz = (rd.z > 0 ? 1 : 0);
 
     // current voxel coords
     int x, y, z;
-    octreeCoordsDepth(p, &x, &y, &z, octree, depth);
+    octreeCoordsLod(p, &x, &y, &z, octree, lod);
 
     // add offsets
     int xn = (x + sx);
@@ -256,7 +257,7 @@ Vector3D voxelSkipLOD(Vector3D p, Vector3D rd, int depth, Octree octree)
     // Vector3D p0 = voxelOrig(xn, yn, zn, octree);
 
     // possible intersections (only one component is needed)
-    Vector3D pe = voxelOrigDepth(xn, yn, zn, octree, depth);
+    Vector3D pe = voxelOrigLod(xn, yn, zn, octree, lod);
 
     // distance to edges
     float dx = (pe.x - p.x) / (rd.x);
@@ -272,23 +273,18 @@ Vector3D voxelSkipLOD(Vector3D p, Vector3D rd, int depth, Octree octree)
     dmin = MIN(dmin, dz);
     // float dmax = MAX(MAX(dx, dy), dz);
     // float dmid = dx + dy + dz - (dmin + dmax);
-    // if (dmin <= 0)
-    //     dmin = 0;
-    // if (dmid <= 0)
-    //     dmid = dmax;
 
-    // between min and mid to avoind landing just on the edge
     float d = dmin;
 
     // just in case
     if (d <= 0.)
     {
-        d = .0;
+        d = 0;
     }
-
-    d += .1;
+    d += .02;
 
     minstep = MIN(d, minstep);
+    maxstep = MAX(d, maxstep);
 
     p.x += d * rd.x;
     p.y += d * rd.y;
@@ -312,6 +308,7 @@ LinkedListNode *rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
     bool hit = false;
     minB = DEPTH;
     minstep = 1e6;
+    maxstep = 0.;
 
     // TODO: refactor octree system to allow flexibility over its bounds
     while (ro.x >= octree.world_offset.x && ro.x < octree.world_size.x + octree.world_offset.x && ro.y >= octree.world_offset.y && ro.y < octree.world_size.y + octree.world_offset.y && ro.z >= octree.world_offset.z && ro.z < octree.world_size.z + octree.world_offset.z)
@@ -342,8 +339,18 @@ LinkedListNode *rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
             }
             else if (b == 0)
             {
+                // TODO: triangle intersection here
+                if (true)
+                {
+                    return (LinkedListNode *)cell[loc];
+                }
+                else
+                {
+                    // no triangle intersection, keep going
+                    ro = voxelSkipLOD(ro, rd, 0, octree);
+                    break;
+                }
                 // printf("hit something!\n");
-                return (LinkedListNode *)cell[loc];
             }
             else
             {
@@ -456,7 +463,7 @@ int main_render(float *buffer, int frame)
 
     //  Traverse octree ( arbitrary ray)
 
-    Vector3D p = (Vector3D){0.01, 0.01, (30 - frame)};
+    Vector3D p = (Vector3D){0.01, 0.01, (29 - frame)};
     // Vector3D rd = normalize((Vector3D){-.3, .05, -.5});
     // LinkedListNode *hit = rayCast_voxel_octree(p, rd, octree);
     // exit(0);
@@ -468,6 +475,7 @@ int main_render(float *buffer, int frame)
         {
             float *px = frameBufferAt(fBuffer, i, j);
             float u = (i - (float)WIDTH / 2.) / (float)HEIGHT;
+            // normalize is not required, but it feels wrong to omit it
             Vector3D rd = normalize((Vector3D){-u, v, -.5});
 
             LinkedListNode *hit = rayCast_voxel_octree(p, rd, octree);
@@ -481,7 +489,7 @@ int main_render(float *buffer, int frame)
             }
             else
             {
-                px[0] = 1. - (minB) / (float)(DEPTH), px[1] = 1. - exp2f(-minstep * .1), px[2] = 0;
+                px[0] = 1. - (minB) / (float)(DEPTH), px[1] = 1. - exp2f(-minstep * 2.), px[2] = 1. - exp2f(-maxstep * .05);
             }
         }
     }
