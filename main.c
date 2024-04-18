@@ -85,17 +85,28 @@ void usleep(__int64 usec)
 
 // Shaders
 
+// Function to calculate the shading of a chessboard pattern on a surface
 void chessboardShader(float bufferColor[4], int x, int y, Vector2D uv, float inverseDepth, SurfaceAttributes attribs, SceneAttributes scene)
 {
+    // Initialize illumination to 1.0 (full brightness)
     float illumination = 1.;
+
+    // If the surface has a non-zero normal vector...
     if (dot(attribs.normal, attribs.normal) > 0.)
     {
+        // Calculate the dot product of the normal and lightVector to get the directional intensity of the lighting on the surface
         illumination = MAX(0., dot(attribs.normal, scene.lightVector)) + .05 * MAX(0., -attribs.normal.y);
     }
+
+    // Calculate a texture value based on the UV coordinates of the surface (creating a chessboard pattern)
     float texture = (fmodf((uv.x * 4.0f), 1.0f) > .5 ^ fmodf((uv.y * 4.0f), 1.0f) > .5) ? 1. : .01;
+
+    // Apply the calculated illumination and texture to the color of the surface, storing the result in bufferColor array
     bufferColor[0] = (illumination * scene.direct.x + scene.ambient.x) * attribs.color.x * texture;
     bufferColor[1] = (illumination * scene.direct.y + scene.ambient.y) * attribs.color.y * texture;
     bufferColor[2] = (illumination * scene.direct.z + scene.ambient.z) * attribs.color.z * texture;
+
+    // Store the inverseDepth in the fourth element of the bufferColor array
     bufferColor[3] = inverseDepth;
 }
 
