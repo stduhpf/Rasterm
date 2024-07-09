@@ -488,12 +488,13 @@ Vector3D voxelSkipLOD(Vector3D p, Vector3D rd, int lod, Octree octree)
     // point in the 3 possible axis-aligned intersections planes in world space
     Vector3D pe = voxelOrigLod(x + sx, y + sy, z + sz, octree, lod);
 
+    const float eps = 5e-6;
+    float overshoot = 1.005;
     // distance to planes
-    float dx = (pe.x - p.x) / (rd.x);
-    float dy = (pe.y - p.y) / (rd.y);
-    float dz = (pe.z - p.z) / (rd.z);
+    float dx = fabs(rd.x) > eps ? overshoot * (pe.x - p.x) / (rd.x) : 1e6;
+    float dy = fabs(rd.y) > eps ? overshoot * (pe.y - p.y) / (rd.y) : 1e6;
+    float dz = fabs(rd.z) > eps ? overshoot * (pe.z - p.z) / (rd.z) : 1e6;
 
-    const float eps = .0002;
 
     if(dx<=0) dx = 1e6;
     if(dy<=0) dy = 1e6;
