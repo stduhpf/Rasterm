@@ -124,7 +124,7 @@ bool edgeIntersect(float ax, float ay, float bx, float by, float edgeX, float mi
         float dba = (ax - bx);
 
         float ga = dea / (dba);
-        float py = by + (ay - by) * ga;
+        float py = ay + (by - ay) * ga;
 
         if (py >= minY && py <= maxY)
             return true;
@@ -160,20 +160,21 @@ bool faceIntersect(Vector3D A, Vector3D B, Vector3D C, float faceX, float minY, 
             a = &A, b = &B, c = &C;
         else if (AC > 0)
             // A and C are on the same side => B is the odd one
-            a = &A, b = &C, c = &B;
+            a = &C, b = &A, c = &B;
         else
             // B and C are on the same side => A is the odd one
-            a = &C, b = &B, c = &A;
+            a = &B, b = &C, c = &A;
         //  now we assume a and b are on the same side of the plane
 
         // projection:
-        float dfa = (a->x - faceX);
-        float dfb = (b->x - faceX);
-        float dca = (a->x - c->x);
-        float dcb = (b->x - c->x);
+        // we project a and b onto the plane in the direction of c
+        // this gives us the segment where the 3D triangle intersects the plane
+        float dfc = (c->x - faceX);
+        float dca = (c->x - a->x);
+        float dcb = (c->x - b->x);
 
-        float ga = dfa / (dca);
-        float gb = dfb / (dcb);
+        float ga = dfc / dca;
+        float gb = dfc / dcb;
 
         float ay = c->y + (a->y - c->y) * ga;
         float az = c->z + (a->z - c->z) * ga;
@@ -183,9 +184,12 @@ bool faceIntersect(Vector3D A, Vector3D B, Vector3D C, float faceX, float minY, 
         float dy = by - ay, dz = bz - az;
         // now we do 2D intersection of segment and cube
 
-        bool pointInPixel = ay >= minY && ay <= maxY && az >= minZ && az <= maxZ;
-        pointInPixel = pointInPixel || by >= minY && by <= maxY && bz >= minZ && bz <= maxZ;
-        if (pointInPixel)
+        bool pointAInFace = ay >= minY && ay <= maxY && az >= minZ && az <= maxZ;
+        bool pointBInFace = by >= minY && by <= maxY && bz >= minZ && bz <= maxZ;
+        bool pointInFace = pointAInFace || pointBInFace;
+
+        if (pointInFace)
+            // this means at least one triangle edge gos through the face
             return true;
         // iterate face edges
         else if (edgeIntersect(ay, az, by, bz, minY, minZ, maxZ))
@@ -211,12 +215,14 @@ bool faceIntersect(Vector3D A, Vector3D B, Vector3D C, float faceX, float minY, 
  */
 bool voxelIntersect(Vector3D *A, Vector3D *B, Vector3D *C, Vector3D vMin, Vector3D vMax)
 {
-    bool vertexInVoxel = A->x >= vMin.x && A->x <= vMax.x && A->y >= vMin.y && A->y <= vMax.y && A->z >= vMin.z && A->z <= vMax.z;
-    vertexInVoxel = vertexInVoxel || (B->x >= vMin.x && B->x <= vMax.x && B->y >= vMin.y && B->y <= vMax.y && B->z >= vMin.z && B->z <= vMax.z);
-    vertexInVoxel = vertexInVoxel || (C->x >= vMin.x && C->x <= vMax.x && C->y >= vMin.y && C->y <= vMax.y && C->z >= vMin.z && C->z <= vMax.z);
+    bool vAInVoxel = A->x >= vMin.x && A->x <= vMax.x && A->y >= vMin.y && A->y <= vMax.y && A->z >= vMin.z && A->z <= vMax.z;
+    bool vBInVoxel = B->x >= vMin.x && B->x <= vMax.x && B->y >= vMin.y && B->y <= vMax.y && B->z >= vMin.z && B->z <= vMax.z;
+    bool vCInVoxel = C->x >= vMin.x && C->x <= vMax.x && C->y >= vMin.y && C->y <= vMax.y && C->z >= vMin.z && C->z <= vMax.z;
 
-    Vector3D Ay = (Vector3D){A->y, A->x, A->z}, By = (Vector3D){B->y, B->x, B->z}, Cy = (Vector3D){C->y, C->x, C->z};
-    Vector3D Az = (Vector3D){A->z, A->y, A->x}, Bz = (Vector3D){B->z, B->y, B->x}, Cz = (Vector3D){C->z, C->y, C->x};
+    bool vertexInVoxel = vAInVoxel || vBInVoxel || vCInVoxel;
+
+    Vector3D Ay = (Vector3D){A->y, A->z, A->x}, By = (Vector3D){B->y, B->z, B->x}, Cy = (Vector3D){C->y, C->z, C->x};
+    Vector3D Az = (Vector3D){A->z, A->x, A->y}, Bz = (Vector3D){B->z, B->x, B->y}, Cz = (Vector3D){C->z, C->x, C->y};
     if (vertexInVoxel)
         return true;
     // iterate voxel faces
@@ -224,13 +230,13 @@ bool voxelIntersect(Vector3D *A, Vector3D *B, Vector3D *C, Vector3D vMin, Vector
         return true;
     else if (faceIntersect(*A, *B, *C, vMax.x, vMin.y, vMax.y, vMin.z, vMax.z))
         return true;
-    else if (faceIntersect(Ay, By, Cy, vMin.y, vMin.x, vMax.x, vMin.z, vMax.z))
+    else if (faceIntersect(Ay, By, Cy, vMin.y, vMin.z, vMax.z, vMin.x, vMax.x))
         return true;
-    else if (faceIntersect(Ay, By, Cy, vMax.y, vMin.x, vMax.x, vMin.z, vMax.z))
+    else if (faceIntersect(Ay, By, Cy, vMax.y, vMin.z, vMax.z, vMin.x, vMax.x))
         return true;
-    else if (faceIntersect(Az, Bz, Cz, vMin.x, vMin.y, vMax.y, vMin.z, vMax.z))
+    else if (faceIntersect(Az, Bz, Cz, vMin.z, vMin.x, vMax.x, vMin.y, vMax.y))
         return true;
-    else if (faceIntersect(Az, Bz, Cz, vMax.x, vMin.y, vMax.y, vMin.z, vMax.z))
+    else if (faceIntersect(Az, Bz, Cz, vMax.z, vMin.x, vMax.x, vMin.y, vMax.y))
         return true;
     return false;
 }
