@@ -276,29 +276,27 @@ Vector3D voxelOrigLod(int x, int y, int z, Octree bb, int lod)
     return voxelOrig(x, y, z, bb);
 }
 
-float rayTriangleIntersect(Vector3D rayOrigin, Vector3D rayDirection, Triangle  * tri){
-    const float EPSILON = 1e-6;
+float rayTriangleIntersect(Vector3D ro, Vector3D rd, Triangle  * tri){
 
-    Vector3D edge1 = (Vector3D){tri->B->x - tri->A->x, tri->B->y - tri->A->y, tri->B->z - tri->A->z};
-    Vector3D edge2 = (Vector3D){tri->C->x - tri->A->x, tri->C->y - tri->A->y, tri->C->z - tri->A->z};
-    Vector3D h = cross(rayDirection, edge2);
-    float a = dot(edge1, h);
-    if (a > -EPSILON && a < EPSILON)
-        return -1.0;
-    float f = 1.0 / a;
-    Vector3D s = (Vector3D){rayOrigin.x - tri->A->x, rayOrigin.y - tri->A->y, rayOrigin.z - tri->A->z};
-    float u = f * dot(s, h);
-    if (u < 0.0 || u > 1.0)
-        return -1.0;
-    Vector3D q = cross(s, edge1);
-    float v = f * (rayDirection.x * q.x + rayDirection.y * q.y + rayDirection.z * q.z);
-    if (v < 0.0 || u + v > 1.0)
-        return -1.0;
-    float t = f * dot(edge2, q);
-    if (t > EPSILON)
-        return t;
-    else
-        return -1.0;
+    Vector3D a = (Vector3D){tri->B->x - tri->A->x, tri->B->y - tri->A->y, tri->B->z - tri->A->z};
+    Vector3D b = (Vector3D){tri->C->x - tri->A->x, tri->C->y - tri->A->y, tri->C->z - tri->A->z};
+
+    Vector3D o = (Vector3D){ro.x - tri->A->x, ro.y - tri->A->y, ro.z - tri->A->z};
+
+    Vector3D n = cross(a, b);
+
+    float h = -dot(o, n)/dot(rd, n);
+
+    Vector3D p = (Vector3D){o.x + h*rd.x, o.y + h*rd.y, o.z + h*rd.z};
+
+    //now we calculate u and v
+    float u = dot(cross(p, b), n)/dot(n, n);
+    float v = dot(cross(a, p), n)/dot(n, n);
+
+    if(u >= 0 && v >= 0 && u + v <= 1){
+        return h;
+     }
+     return -1;
 }
 
 
