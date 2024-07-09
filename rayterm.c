@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <math.h>
+#include <assert.h>
+#include <time.h>
 
 // #include "pot.h"
 
@@ -72,12 +74,120 @@ int faceCount;
 // 8+8*8+8*8*8
 // (8^n-1)*8/7
 
+/**
+ * @brief Converts world coordinates to octree space coordinates.
+ *
+ * This function takes a 3D vector of world coordinates and an octree bounding box as input,
+ * and returns a 3D vector of octree space coordinates. It does this by subtracting the world
+ * offset from the world coordinates, dividing the result by the world size, and then multiplying
+ * by the octree span.
+ *
+ * @param world_coords The 3D vector of world coordinates to be converted.
+ * @param bb The octree bounding box.
+ * @return Vector3D The 3D vector of octree space coordinates.
+ */
+Vector3D toOctreeSpace(Vector3D world_coords, Octree bb){
+    Vector3D octree_coords = (Vector3D){
+        octree_span * (world_coords.x - bb.world_offset.x) / bb.world_size.x,
+        octree_span * (world_coords.y - bb.world_offset.y) / bb.world_size.y,
+        octree_span * (world_coords.z - bb.world_offset.z) / bb.world_size.z
+    };
+    return octree_coords;
+}
+
+/**
+ * @brief Converts octree space coordinates to world coordinates.
+ *
+ * This function takes a 3D vector of octree space coordinates and an octree bounding box as input,
+ * and returns a 3D vector of world coordinates. It does this by dividing the octree space coordinates
+ * by the octree span, multiplying the result by the world size, and then adding the world offset.
+ *
+ * @param octree_coords The 3D vector of octree space coordinates to be converted.
+ * @param bb The octree bounding box.
+ * @return Vector3D The 3D vector of world coordinates.
+ */
+Vector3D octreeToWorldSpace(Vector3D octree_coords, Octree bb){
+    Vector3D world_coords;
+    world_coords.x = (octree_coords.x / octree_span) * bb.world_size.x + bb.world_offset.x;
+    world_coords.y = (octree_coords.y / octree_span) * bb.world_size.y + bb.world_offset.y;
+    world_coords.z = (octree_coords.z / octree_span) * bb.world_size.z + bb.world_offset.z;
+    return world_coords;
+}
+
+/**
+ * @brief Calculates the integer coordinates for a given 3D vector.
+ *
+ * This function calculates the integer coordinates for a given 3D vector.
+ * It does this by casting the x, y, and z components of the vector to integers
+ * and storing the results in the x, y, and z pointers.
+ *
+ * @param coords The 3D vector for which to calculate the integer coordinates.
+ * @param x A pointer to an integer that will be set to the x coordinate.
+ * @param y A pointer to an integer that will be set to the y coordinate.
+ * @param z A pointer to an integer that will be set to the z coordinate.
+ */
+void intCoords(Vector3D coords, int *x, int *y, int *z)
+{
+    *x = (int)floorf(coords.x);
+    *y = (int)floorf(coords.y);
+    *z = (int)floorf(coords.z);
+}
+/**
+ * @brief Calculates the integer coordinates for a given 3D vector at a specific level of detail (LoD).
+ *
+ * This function calculates the integer coordinates for a given 3D vector at a specific level of detail (LoD).
+ * It does this by casting the x, y, and z components of the vector to integers and then shifting these
+ * values right by the specified LoD value. This effectively reduces the resolution of the integer coordinates,
+ * allowing for coarser-grained representations of the 3D vector at lower levels of detail.
+ *
+ * @param coords The 3D vector for which to calculate the integer coordinates.
+ * @param x A pointer to an integer that will be set to the x coordinate.
+ * @param y A pointer to an integer that will be set to the y coordinate.
+ * @param z A pointer to an integer that will be set to the z coordinate.
+ * @param lod The level of detail at which to calculate the integer coordinates.
+ */
+void intCoordsLod(Vector3D coords, int *x, int *y, int *z, int lod)
+{
+    *x = (int)floorf(coords.x) >> lod;
+    *y = (int)floorf(coords.y) >> lod;
+    *z = (int)floorf(coords.z) >> lod;
+}
+
+/**
+ * @brief Calculates the octree coordinates for a given world coordinate.
+ *
+ * This function calculates the octree coordinates for a given world coordinate.
+ * It does this by subtracting the world offset from the world coordinate,
+ * dividing the result by the world size, and then multiplying by the octree span.
+ * The resulting value is cast to an integer and stored in the x, y, and z pointers.
+ *
+ * @param worldCoords The world coordinates for which to calculate the octree coordinates.
+ * @param x A pointer to an integer that will be set to the x octree coordinate.
+ * @param y A pointer to an integer that will be set to the y octree coordinate.
+ * @param z A pointer to an integer that will be set to the z octree coordinate.
+ * @param bb The bounding box of the octree.
+ */
 void octreeCoords(Vector3D worldCoords, int *x, int *y, int *z, Octree bb)
 {
-    *x = (int)((float)octree_span * (worldCoords.x - bb.world_offset.x) / bb.world_size.x);
-    *y = (int)((float)octree_span * (worldCoords.y - bb.world_offset.y) / bb.world_size.y);
-    *z = (int)((float)octree_span * (worldCoords.z - bb.world_offset.z) / bb.world_size.z);
+    Vector3D octreeCoords = toOctreeSpace(worldCoords, bb);
+    intCoords(octreeCoords, x, y, z);
 }
+
+/**
+ * @brief Calculates the octree coordinates for a given world coordinate at a specific level of detail (LoD).
+ *
+ * This function calculates the octree coordinates for a given world coordinate at a specific level of detail (LoD).
+ * It first calculates the octree coordinates without considering the LoD, and then shifts these coordinates right
+ * by the specified LoD value. This effectively reduces the resolution of the octree coordinates, allowing for
+ * coarser-grained representations of the world at lower levels of detail.
+/**
+ * @brief Calculates the octree coordinates for a given world coordinate at a specific level of detail (LoD).
+ *
+ * @param y A pointer to an integer that will be set to the y octree coordinate.
+ * @param z A pointer to an integer that will be set to the z octree coordinate.
+ * @param bb The bounding box of the octree.
+ * @param lod The level of detail at which to calculate the octree coordinates.
+ */
 void octreeCoordsLod(Vector3D worldCoords, int *x, int *y, int *z, Octree bb, int lod)
 {
     octreeCoords(worldCoords, x, y, z, bb);
@@ -86,12 +196,78 @@ void octreeCoordsLod(Vector3D worldCoords, int *x, int *y, int *z, Octree bb, in
     *z >>= lod;
 }
 
+/**
+ * @brief Converts integer coordinates to floating-point coordinates.
+ *
+ * This function takes three integer values representing x, y, and z coordinates
+ * and returns a Vector3D structure with these coordinates converted to floating-point values.
+ *
+ * @param x The x coordinate as an integer.
+ * @param y The y coordinate as an integer.
+ * @param z The z coordinate as an integer.
+ * @return A Vector3D structure with the x, y, and z coordinates converted to floating-point values.
+ */
+Vector3D floatCoords(int x, int y, int z)
+{
+    return (Vector3D){(float)x, (float)y, (float)z};
+}
+
+/**
+ * @brief Converts integer coordinates to floating-point coordinates at a specific level of detail (LoD).
+ *
+ * This function takes three integer values representing x, y, and z coordinates and a level of detail (LoD).
+ * It then shifts these integer coordinates left by the specified LoD value, effectively increasing the resolution
+ * of the coordinates. The resulting values are then converted to floating-point values and returned as a Vector3D structure.
+ *
+ * @param x The x coordinate as an integer.
+ * @param y The y coordinate as an integer.
+ * @param z The z coordinate as an integer.
+ * @param lod The level of detail at which to convert the integer coordinates to floating-point coordinates.
+ * @return A Vector3D structure with the x, y, and z coordinates converted to floating-point values at the specified level of detail.
+ */
+Vector3D floatCoordsLod(int x, int y, int z, int lod)
+{
+    x <<= lod;
+    y <<= lod;
+    z <<= lod;
+    return floatCoords(x, y, z);
+}
+
+/**
+ * @brief Calculates the world coordinates of the origin of a voxel in the octree.
+ *
+ * This function calculates the world coordinates of the origin of a voxel in the octree,
+ * given its integer coordinates (x, y, z) and the bounding box of the octree (bb).
+ * It does this by adding the world offset of the octree to the scaled integer coordinates,
+ * where the scaling is determined by the size of the world and the span of the octree.
+ *
+ * @param x The x coordinate of the voxel in the octree.
+ * @param y The y coordinate of the voxel in the octree.
+ * @param z The z coordinate of the voxel in the octree.
+ * @param bb The bounding box of the octree.
+ * @return A Vector3D structure with the world coordinates of the origin of the voxel.
+ */
 Vector3D voxelOrig(int x, int y, int z, Octree bb)
 {
-    return (Vector3D){bb.world_offset.x + ((float)x) * bb.world_size.x / (float)octree_span,
-                      bb.world_offset.y + ((float)y) * bb.world_size.y / (float)octree_span,
-                      bb.world_offset.z + ((float)z) * bb.world_size.z / (float)octree_span};
+    Vector3D octreeCoords = floatCoords(x, y, z);
+    return octreeToWorldSpace(octreeCoords, bb);
 }
+
+/**
+ * @brief Calculates the world coordinates of the origin of a voxel in the octree at a specific level of detail (LoD).
+ *
+ * This function calculates the world coordinates of the origin of a voxel in the octree at a specific level of detail (LoD).
+ * It does this by first shifting the integer coordinates (x, y, z) left by the specified LoD value, effectively increasing
+ * the resolution of the coordinates. The resulting values are then used to calculate the world coordinates of the origin
+ * of the voxel using the voxelOrig function.
+ *
+ * @param x The x coordinate of the voxel in the octree.
+ * @param y The y coordinate of the voxel in the octree.
+ * @param z The z coordinate of the voxel in the octree.
+ * @param bb The bounding box of the octree.
+ * @param lod The level of detail at which to calculate the world coordinates of the voxel origin.
+ * @return A Vector3D structure with the world coordinates of the origin of the voxel at the specified level of detail.
+ */
 Vector3D voxelOrigLod(int x, int y, int z, Octree bb, int lod)
 {
     x <<= lod;
@@ -100,16 +276,47 @@ Vector3D voxelOrigLod(int x, int y, int z, Octree bb, int lod)
     return voxelOrig(x, y, z, bb);
 }
 
+float rayTriangleIntersect(Vector3D rayOrigin, Vector3D rayDirection, Triangle  * tri){
+    const float EPSILON = 1e-6;
+
+    Vector3D edge1 = (Vector3D){tri->B->x - tri->A->x, tri->B->y - tri->A->y, tri->B->z - tri->A->z};
+    Vector3D edge2 = (Vector3D){tri->C->x - tri->A->x, tri->C->y - tri->A->y, tri->C->z - tri->A->z};
+    Vector3D h = cross(rayDirection, edge2);
+    float a = dot(edge1, h);
+    if (a > -EPSILON && a < EPSILON)
+        return -1.0;
+    float f = 1.0 / a;
+    Vector3D s = (Vector3D){rayOrigin.x - tri->A->x, rayOrigin.y - tri->A->y, rayOrigin.z - tri->A->z};
+    float u = f * dot(s, h);
+    if (u < 0.0 || u > 1.0)
+        return -1.0;
+    Vector3D q = cross(s, edge1);
+    float v = f * (rayDirection.x * q.x + rayDirection.y * q.y + rayDirection.z * q.z);
+    if (v < 0.0 || u + v > 1.0)
+        return -1.0;
+    float t = f * dot(edge2, q);
+    if (t > EPSILON)
+        return t;
+    else
+        return -1.0;
+}
+
+
 /**
  * @brief Checks if an arbitrary 2D segment intersects an other segment aligned with the y axis
  *
- * @param ax starting x value of the segment
- * @param ay starting y value of the segment
- * @param bx ending x value of the segment
- * @param by ending y value of the segment
+ * This function determines if a line segment, defined by its starting and ending x and y coordinates,
+ * intersects with a vertical line segment aligned with the y axis. The intersection is checked by
+ * projecting the line segment onto the y axis and seeing if the projected segment overlaps with the
+ * vertical segment.
+ *
+ * @param ax Starting x value of the segment
+ * @param ay Starting y value of the segment
+ * @param bx Ending x value of the segment
+ * @param by Ending y value of the segment
  * @param edgeX x coordinate of all points in the second segment
- * @param minY starting y value of the other segment
- * @param maxY ending y value of the other segment
+ * @param minY Starting y value of the other segment
+ * @param maxY Ending y value of the other segment
  * @return true if there is an intersection
  */
 bool edgeIntersect(float ax, float ay, float bx, float by, float edgeX, float minY, float maxY)
@@ -149,11 +356,13 @@ bool faceIntersect(Vector3D A, Vector3D B, Vector3D C, float faceX, float minY, 
     float dA = (A.x - faceX);
     float dB = (B.x - faceX);
     float dC = (C.x - faceX);
+    
+    // check signs
     float AB = dA * dB;
     float AC = dA * dC;
     if (AB <= 0 || AC <= 0)
     {
-        // one point is on the other side of the face => plane intersection
+        // one point is alone on the other side of the face => plane intersection
         Vector3D *a, *b, *c;
         if (AB > 0)
             // A and B are on the same side => C is the odd one
@@ -181,7 +390,10 @@ bool faceIntersect(Vector3D A, Vector3D B, Vector3D C, float faceX, float minY, 
         float by = c->y + (b->y - c->y) * gb;
         float bz = c->z + (b->z - c->z) * gb;
 
+        // vector from projected a to projected b
         float dy = by - ay, dz = bz - az;
+
+
         // now we do 2D intersection of segment and cube
 
         bool pointAInFace = ay >= minY && ay <= maxY && az >= minZ && az <= maxZ;
@@ -243,63 +455,86 @@ bool voxelIntersect(Vector3D *A, Vector3D *B, Vector3D *C, Vector3D vMin, Vector
 
 float minstep;
 float maxstep;
+int calls;
 
-// TODO: fix that shit (see dubug.glsl:should work???)
-// Why the hell would it work perfectly in 2D shader, but not 3D C???
+bool broken;
+
+
+/**
+ * @brief Calculates the next voxel to traverse in the octree structure based on the ray's direction and the current position.
+ *
+ * This function takes the current position (p), the ray direction (rd), the level of detail (lod), and the octree structure.
+ * It calculates the current voxel coordinates, the ray offsets, and the distances to the edges of the voxel.
+ * It then determines the minimum distance (d) to the next intersection plane and updates the minimum and maximum step values.
+ * Finally, it returns the new position (p) after traversing the minimum distance (d) along the ray direction (rd).
+ *
+ * @param p The current position.
+ * @param rd The ray direction.
+ * @param lod The level of detail.
+ * @param octree The octree structure.
+ * @return Vector3D The new position after traversing the minimum distance along the ray direction.
+ */
 Vector3D voxelSkipLOD(Vector3D p, Vector3D rd, int lod, Octree octree)
 {
-    // ray offsets
-    int sx = (rd.x > 0 ? 1 : 0), sy = (rd.y > 0 ? 1 : 0), sz = (rd.z > 0 ? 1 : 0);
-
-    // current voxel coords
+    calls++;
+    
+    // current voxel coords in integers
     int x, y, z;
     octreeCoordsLod(p, &x, &y, &z, octree, lod);
 
-    // add offsets
-    int xn = (x + sx);
-    int yn = (y + sy);
-    int zn = (z + sz);
+    // ray direction offsets 
+    int sx = (rd.x >= 0 ? 1 : 0),
+        sy = (rd.y >= 0 ? 1 : 0),
+        sz = (rd.z >= 0 ? 1 : 0);
 
-    // Vector3D p0 = voxelOrig(xn, yn, zn, octree);
+    // point in the 3 possible axis-aligned intersections planes in world space
+    Vector3D pe = voxelOrigLod(x + sx, y + sy, z + sz, octree, lod);
 
-    // possible intersections (only one component is needed)
-    Vector3D pe = voxelOrigLod(xn, yn, zn, octree, lod);
-
-    // distance to edges
+    // distance to planes
     float dx = (pe.x - p.x) / (rd.x);
     float dy = (pe.y - p.y) / (rd.y);
     float dz = (pe.z - p.z) / (rd.z);
 
-    // if (dz <= 0.000001)
-    // {
-    //     printf("wtf: dz=%f, \tsz = %d, \tpz = %f, \tp.z = %f, \trd.z=%f\n", dz, sz, pe.z, p.z, rd.z);
-    // }
+    const float eps = .0002;
 
-    float dmin = MIN(dx, dy);
-    dmin = MIN(dmin, dz);
-    // float dmax = MAX(MAX(dx, dy), dz);
-    // float dmid = dx + dy + dz - (dmin + dmax);
+    if(dx<=0) dx = 1e6;
+    if(dy<=0) dy = 1e6;
+    if(dz<=0) dz = 1e6;
 
-    float d = dmin;
 
-    // just in case
-    if (d <= 0.)
-    {
-        d = 0;
-    }
-    d += .02;
+    float d = MIN(dx, dy);
+          d = MIN(d, dz);
 
+    // assert(d>=0);
     minstep = MIN(d, minstep);
     maxstep = MAX(d, maxstep);
 
-    p.x += d * rd.x;
-    p.y += d * rd.y;
-    p.z += d * rd.z;
+    d += eps;
 
-    return p;
+    Vector3D ret = (Vector3D){ p.x + d * rd.x,
+                               p.y + d * rd.y,
+                               p.z + d * rd.z};
+
+    int retx, rety, retz;
+    octreeCoordsLod(ret, &retx, &rety, &retz, octree, lod);
+
+    if (retx == x && rety == y && retz == z){
+        // shouldn't be possible, but here we are
+        // printf("broken\n");
+        broken = true;
+    }
+
+    return ret;
 }
 
 int minB;
+int triChecks;
+
+bool inBounds(Vector3D p, Octree octree){
+    return p.x >= octree.world_offset.x && p.x < octree.world_size.x + octree.world_offset.x 
+        && p.y >= octree.world_offset.y && p.y < octree.world_size.y + octree.world_offset.y 
+        && p.z >= octree.world_offset.z && p.z < octree.world_size.z + octree.world_offset.z;
+}
 
 /**
  * @brief check if a ray intersects some non-empty voxel in an octree structure
@@ -316,61 +551,90 @@ LinkedListNode *rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
     minstep = 1e6;
     maxstep = 0.;
 
+    int maxLod = DEPTH - 1;
     // TODO: refactor octree system to allow flexibility over its bounds
-    while (ro.x >= octree.world_offset.x && ro.x < octree.world_size.x + octree.world_offset.x && ro.y >= octree.world_offset.y && ro.y < octree.world_size.y + octree.world_offset.y && ro.z >= octree.world_offset.z && ro.z < octree.world_size.z + octree.world_offset.z)
+    while (inBounds(ro, octree))
     {
-        // printf("p: %f, %f, %f\n", ro.x, ro.y, ro.z);
-        int xi, yi, zi;
-        octreeCoords(ro, &xi, &yi, &zi, octree);
+        if(broken){
+            return NULL;
+        }
+        int cellX, cellY, cellZ;
+        octreeCoords(ro, &cellX, &cellY, &cellZ, octree);
+
         intptr_t *root = octree.data;
         intptr_t cell_off = 0;
-        int w = 1;
+
         // TODO: smarter starting LOD depending on previous step?
-        for (int b = DEPTH - 1; b >= 0; b--)
+        for (int b = maxLod; b >= 0; b--)
         {
             minB = MIN(b, minB);
 
-            int cx = (xi >> b) % 2;
-            int cy = (yi >> b) % 2;
-            int cz = (zi >> b) % 2;
+            int cx = (cellX >> b) & 1;
+            int cy = (cellY >> b) & 1;
+            int cz = (cellZ >> b) & 1;
 
-            int loc = cx + 2 * cy + 4 * cz;
+            int loc = cx + (cy<<1) + (cz<<2);
             intptr_t *cell = root + cell_off;
             if (!cell[loc])
             {
-                // printf("skipping at level %d\n", b);
-                ro = voxelSkipLOD(ro, rd, b, octree);
 
+                // 0 means empty, skip this cell and its children
+                ro = voxelSkipLOD(ro, rd, b, octree);
                 break;
             }
             else if (b == 0)
             {
-                // TODO: triangle intersection here
-                if (true)
+                LinkedListNode * node = ((LinkedListNode *)cell[loc]);
+                bool hit = false;
+                while (node != NULL)
                 {
-                    return (LinkedListNode *)cell[loc];
+                    triChecks++;
+                    if(rayTriangleIntersect(ro, rd, node->T)>0)
+                    {
+                        hit = true;
+                        break;
+                    }
+                    node = node->next;
+                }
+
+                if (hit)
+                {
+                    // hit something, end of loop
+                    return node;
                 }
                 else
                 {
-                    // no triangle intersection, keep going
+                    // no triangle intersection, keep going to next leaf
                     ro = voxelSkipLOD(ro, rd, 0, octree);
                     break;
-                }
-                // printf("hit something!\n");
+                } 
             }
             else
             {
                 // printf("deeper...\n");
-                w *= 8;
-                root += w;
+                root += 1 << 3 * (DEPTH-b);
                 cell_off += loc;
                 cell_off *= 8;
             }
         }
     }
+    // no hits
     return NULL;
 }
 
+/**
+ * @brief Builds an octree structure from a set of triangles.
+ *
+ * This function takes an octree structure, an array of triangles, the number of triangles,
+ * and a linked list of nodes. It iterates over each triangle, calculates its AABB (Axis-Aligned Bounding Box),
+ * and checks for intersections with voxels within the octree. If an intersection is found, the triangle is added
+ * to the linked list of the corresponding voxel.
+ *
+ * @param octree The octree structure to be built.
+ * @param triangles An array of triangles to be voxelized and added to the octree.
+ * @param triCount The number of triangles in the array.
+ * @param nodes A linked list of nodes used to store the triangles in the octree.
+ */
 void build_octree(Octree octree, Triangle *triangles, int triCount, LinkedListNode *nodes)
 {
     LinkedListNode *lastNodePtr = nodes;
@@ -383,12 +647,12 @@ void build_octree(Octree octree, Triangle *triangles, int triCount, LinkedListNo
         triangles[f] = (Triangle){A, B, C};
 
         // triangle's AABB
-        Vector3D AABB_min = (Vector3D){MIN(A->x, MIN(B->x, C->x)),
-                                       MIN(A->y, MIN(B->y, C->y)),
-                                       MIN(A->z, MIN(B->z, C->z))};
-        Vector3D AABB_max = (Vector3D){MAX(A->x, MAX(B->x, C->x)),
-                                       MAX(A->y, MAX(B->y, C->y)),
-                                       MAX(A->z, MAX(B->z, C->z))};
+        Vector3D AABB_min = (Vector3D){MIN(A->x, (MIN(B->x, C->x))),
+                                       MIN(A->y, (MIN(B->y, C->y))),
+                                       MIN(A->z, (MIN(B->z, C->z)))};
+        Vector3D AABB_max = (Vector3D){MAX(A->x, (MAX(B->x, C->x))),
+                                       MAX(A->y, (MAX(B->y, C->y))),
+                                       MAX(A->z, (MAX(B->z, C->z)))};
         int xMin, yMin, zMin;
         octreeCoords(AABB_min, &xMin, &yMin, &zMin, octree);
         int xMax, yMax, zMax;
@@ -403,21 +667,20 @@ void build_octree(Octree octree, Triangle *triangles, int triCount, LinkedListNo
                 {
                     // get voxel bounds
                     Vector3D vMin = voxelOrig(x, y, z, octree);
-                    Vector3D vMax = (Vector3D){vMin.x + octree.world_size.x / octree_span, vMin.y + octree.world_size.y / octree_span, vMin.z + octree.world_size.z / octree_span};
+                    Vector3D vMax = voxelOrig(x + 1, y + 1, z + 1, octree);
 
                     // check if some part of the current triangles is inside the current voxel
                     if (voxelIntersect(A, B, C, vMin, vMax))
                     {
                         intptr_t *root = octree.data;
                         intptr_t cell_off = 0;
-                        int w = 1;
                         for (int b = DEPTH - 1; b >= 0; b--)
                         {
-                            int cx = (x >> b) % 2;
-                            int cy = (y >> b) % 2;
-                            int cz = (z >> b) % 2;
+                            int cx = (x >> b) & 1;
+                            int cy = (y >> b) & 1;
+                            int cz = (z >> b) & 1;
 
-                            int loc = cx + 2 * cy + 4 * cz;
+                            int loc = cx + (cy<<1) + (cz<<2);
                             intptr_t *cell = root + cell_off;
                             if (b == 0)
                             {
@@ -429,8 +692,7 @@ void build_octree(Octree octree, Triangle *triangles, int triCount, LinkedListNo
                             }
                             else
                                 cell[loc]++;
-                            w *= 8;
-                            root += w;
+                            root += 1 << 3 * (DEPTH-b);
                             cell_off += loc;
                             cell_off *= 8;
                         }
@@ -443,11 +705,16 @@ void build_octree(Octree octree, Triangle *triangles, int triCount, LinkedListNo
 
 int main_render(float *buffer, int frame)
 {
+
+    //TODO avoid rebuilding and allocating octree every frame
+
+    time_t start = clock();
+
     FrameBuffer fBuffer = (FrameBuffer){buffer, WIDTH, HEIGHT};
 
     // initialize triangle buffer
     Triangle *triangles = malloc(faceCount * sizeof(Triangle));
-    LinkedListNode *nodes = malloc(faceCount * 256 * sizeof(LinkedListNode));
+    LinkedListNode *nodes = malloc(faceCount * 512 * sizeof(LinkedListNode));
 
     // create voxel octree
     size_t tree_size = 8 * ((1 << (3 * DEPTH)) - 1) / 7;
@@ -465,11 +732,15 @@ int main_render(float *buffer, int frame)
 
     build_octree(octree, triangles, faceCount, nodes);
 
+    time_t octree_build_end = clock();
+
     // printf("\nvoxelization ok\n");
 
     //  Traverse octree ( arbitrary ray)
 
-    Vector3D p = (Vector3D){0.01, 0.01, (29 - frame)};
+    float a = (float)frame*.1;
+    float d = 30.;
+    Vector3D p = (Vector3D){sinf(a)*d, 0.01, -cosf(a)*d};
     // Vector3D rd = normalize((Vector3D){-.3, .05, -.5});
     // LinkedListNode *hit = rayCast_voxel_octree(p, rd, octree);
     // exit(0);
@@ -482,12 +753,22 @@ int main_render(float *buffer, int frame)
             float *px = frameBufferAt(fBuffer, i, j);
             float u = (i - (float)WIDTH / 2.) / (float)HEIGHT;
             // normalize is not required, but it feels wrong to omit it
-            Vector3D rd = normalize((Vector3D){-u, v, -.5});
+            Vector3D rd = normalize((Vector3D){u, v, .5});
+
+            float x = rd.x*cosf(a) - rd.z*sinf(a);
+            float z = rd.x*sinf(a) + rd.z*cosf(a);
+            rd.x = x;
+            rd.z = z;
+
+            broken = false;
+            calls = 0;
+            triChecks = 0;
 
             LinkedListNode *hit = rayCast_voxel_octree(p, rd, octree);
 
             if (hit)
             {
+                // hash triangles to get a color
                 float x = 1000. + 30.14 * hit->T->B->x;
                 float y = 1000. + 30.14 * hit->T->B->y;
                 float z = 1000. + 30.14 * hit->T->B->z;
@@ -495,10 +776,28 @@ int main_render(float *buffer, int frame)
             }
             else
             {
-                px[0] = 1. - (minB) / (float)(DEPTH), px[1] = 1. - exp2f(-minstep * 2.), px[2] = 1. - exp2f(-maxstep * .05);
+
+                if(broken){
+                    px[0] = 1, px[1] = 0, px[2] = 0;
+                }else{
+                    // debug colors
+                    float treeDepth = 1. - (minB) / (float)(DEPTH);
+                    float mind =  1. - exp2f(-minstep * 2.);
+                    float maxd = 1. - exp2f(-maxstep * .1);
+
+                    float calld = 1. - exp2f(-.1*(float)calls);
+                    float calld2 = 1. - exp2f(-1.*(float)triChecks);
+                    px[0] = calld, px[1] = calld, px[2] = calld;
+                }
             }
         }
     }
+    time_t end = clock();
+
+
+    printf("octree build time: %f s\n", (float)(octree_build_end - start) / CLOCKS_PER_SEC);
+    printf("rendering time: %f s\n", (float)(end - octree_build_end) / CLOCKS_PER_SEC);
+    printf("frame time: %f s\n\n", (float)(end - start) / CLOCKS_PER_SEC);
 
     if (0)
     {
