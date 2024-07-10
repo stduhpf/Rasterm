@@ -43,12 +43,17 @@ typedef struct LinkedListStruct
 typedef struct
 {
     Triangle *T;
-    float t;
+    float d;
     Vector3D P;
     Vector3D N;
     Vector2D UV;
 } HitResult;
  
+typedef struct
+{
+    float d;
+    Vector3D P;
+} HitBoxResult;
 
 
 #ifdef MIN
@@ -62,9 +67,8 @@ typedef struct
 
 #define DEPTH 6
 const int octree_span = 1 << DEPTH;
-const float world_size = 60;
-const float world_offset = -world_size / 2;
-// const float voxel_size = world_size / (float)octree_span;
+// const float world_size = 4;
+
 
 typedef struct
 {
@@ -74,6 +78,9 @@ typedef struct
     // content
     intptr_t *data;
 } Octree;
+
+#define OCTREE_PADDING .1
+
 
 bool objLoaded = false;
 Vector3D *vertices = NULL;
@@ -307,7 +314,7 @@ HitResult rayTriangleIntersect(Vector3D ro, Vector3D rd, Triangle * tri){
 
     // TODO: expose u and v (barycentric coordinates) to the caller
 
-    HitResult result = {.T = tri,.t = -1};
+    HitResult result = {.T = tri,.d = -1};
 
     // maybe normal too
     Vector3D a = (Vector3D){tri->A->x - tri->C->x, tri->A->y - tri->C->y, tri->A->z - tri->C->z};
@@ -331,7 +338,7 @@ HitResult rayTriangleIntersect(Vector3D ro, Vector3D rd, Triangle * tri){
     float v = dot(iB, n)/nsq;
 
     if(u >= 0 && v >= 0 && u + v <= 1){
-        result.t = h;
+        result.d = h;
         result.P = (Vector3D){p.x + tri->C->x, p.y + tri->C->y, p.z + tri->C->z};
      }
     result.UV = (Vector2D){u, v};
@@ -340,6 +347,39 @@ HitResult rayTriangleIntersect(Vector3D ro, Vector3D rd, Triangle * tri){
     SCALE_VEC3(result.N, scale_n)
     return result;
 }
+
+/**
+ * @brief Calculates the intersection of a ray with an axis-aligned bounding box (AABB).
+ * 
+ * @param ro the 3D vector representing the origin of the ray
+ * @param rd the 3D vector representing the direction of the ray
+ * @param minpos the 3D vector representing the minimum position of the AABB
+ * @param maxpos the 3D vector representing the maximum position of the AABB
+ * @return 
+ */
+HitBoxResult rayAABBIntersect(Vector3D ro, Vector3D rd, Vector3D minpos, Vector3D size) 
+{
+  Vector3D inverse_dir = (Vector3D){1./rd.x, 1./rd.y, 1./rd.z};
+
+  // 1. Calculate the intersection distances with the min-planes of the AABB.
+  Vector3D tbot = (Vector3D){(minpos.x - ro.x) * inverse_dir.x, (minpos.y - ro.y) * inverse_dir.y, (minpos.z - ro.z) * inverse_dir.z};
+  // 2. Calculate the intersection distances with the max-planes of the AABB.
+  Vector3D ttop = (Vector3D){(minpos.x + size.x - ro.x) * inverse_dir.x, (minpos.y + size.y - ro.y) * inverse_dir.y, (minpos.z + size.z - ro.z) * inverse_dir.z};
+  // 3. Calculate the minimum and maximum intersection distances.
+  Vector3D tmin = (Vector3D){MIN(ttop.x, tbot.x), MIN(ttop.y, tbot.y), MIN(ttop.z, tbot.z)};
+  Vector3D tmax = (Vector3D){MAX(ttop.x, tbot.x), MAX(ttop.y, tbot.y), MAX(ttop.z, tbot.z)};
+
+  float traverselow = MAX(tmin.x, MAX(tmin.y, tmin.z));
+  float traversehi = MIN(tmax.x, MIN(tmax.y, tmax.z));
+
+  float delta = .5f*(traversehi-traverselow);
+
+//   float dist = delta>0? traverselow + MIN(OCTREE_PADDING,delta):-1.;
+  float dist = traverselow + MIN(OCTREE_PADDING,delta);
+
+  return (HitBoxResult){dist, (Vector3D){ro.x + dist * rd.x, ro.y + dist * rd.y, ro.z + dist * rd.z}};
+}
+
 
 
 /**
@@ -579,6 +619,12 @@ HitResult rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
     // minstep = 1e6;
     // maxstep = 0.;
 
+    HitBoxResult res = rayAABBIntersect(ro, rd, octree.world_offset, octree.world_size);
+    if( !inBounds(ro, octree)){
+        // skip to bounding box intersection (if no intersection, it will be somewhere outside the octree)
+        ro = res.P;
+    }
+
     int maxLod = DEPTH - 1;
     // TODO: refactor octree system to allow flexibility over its bounds
     while (inBounds(ro, octree))
@@ -615,16 +661,16 @@ HitResult rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
                 LinkedListNode * node = ((LinkedListNode *)cell[loc]);
                 bool hit = false;
                 #ifdef VOXELIZE_RENDER
-                    HitResult res = rayTriangleIntersect(ro, rd, node->T);
-                    res.P = ro;
-                    return res;
+                    HitResult res_ = rayTriangleIntersect(ro, rd, node->T);
+                    res_.P = ro;
+                    return res_;
                 #endif
-                HitResult res = (HitResult){.T = NULL, .t = 1e6};
+                HitResult res = (HitResult){.T = NULL, .d = 1e6};
                 while (node != NULL)
                 {
                     // triChecks++;
                     HitResult tri = rayTriangleIntersect(ro, rd, node->T);
-                    if(tri.t>0 && tri.t<res.t)
+                    if(tri.d>0 && tri.d<res.d)
                         res = tri;
                     node = node->next;
                 }
@@ -645,7 +691,7 @@ HitResult rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
             }
         }
     }
-    return (HitResult){.T =NULL, .t = -1};
+    return (HitResult){.T =NULL, .d = -1};
     // no hits
 }
 
@@ -662,8 +708,27 @@ HitResult rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
  * @param triCount The number of triangles in the array.
  * @param nodes A linked list of nodes used to store the triangles in the octree.
  */
-void build_octree(Octree octree, Triangle *triangles, int triCount, LinkedListNode *nodes)
+void build_octree(Octree * octree, Triangle *triangles, int triCount, LinkedListNode *nodes)
 {
+    Vector3D vMin = (Vector3D){1e6, 1e6, 1e6};
+    Vector3D vMax = (Vector3D){-1e6, -1e6, -1e6};
+    for (int f = 0; f < triCount; f++)
+    {
+        Vector3D *A = vertices + (faces[f].A - 1);
+        Vector3D *B = vertices + (faces[f].B - 1);
+        Vector3D *C = vertices + (faces[f].C - 1);
+        vMin = (Vector3D){MIN(vMin.x, MIN(A->x, MIN(B->x, C->x))),
+                          MIN(vMin.y, MIN(A->y, MIN(B->y, C->y))),
+                          MIN(vMin.z, MIN(A->z, MIN(B->z, C->z)))};
+        vMax = (Vector3D){MAX(vMax.x, MAX(A->x, MAX(B->x, C->x))),
+                          MAX(vMax.y, MAX(A->y, MAX(B->y, C->y))),
+                          MAX(vMax.z, MAX(A->z, MAX(B->z, C->z)))};
+    }
+    vMin = (Vector3D){vMin.x - OCTREE_PADDING, vMin.y - OCTREE_PADDING, vMin.z - OCTREE_PADDING};
+    vMax = (Vector3D){vMax.x + OCTREE_PADDING, vMax.y + OCTREE_PADDING, vMax.z + OCTREE_PADDING};
+    octree->world_offset = vMin;
+    octree->world_size = (Vector3D){vMax.x - vMin.x, vMax.y - vMin.y, vMax.z - vMin.z};
+
     LinkedListNode *lastNodePtr = nodes;
     //  Voxelize triangles
     for (int f = 0; f < triCount; f++)
@@ -671,6 +736,7 @@ void build_octree(Octree octree, Triangle *triangles, int triCount, LinkedListNo
         Vector3D *A = vertices + (faces[f].A - 1);
         Vector3D *B = vertices + (faces[f].B - 1);
         Vector3D *C = vertices + (faces[f].C - 1);
+
         triangles[f] = (Triangle){A, B, C};
 
         // triangle's AABB
@@ -681,9 +747,9 @@ void build_octree(Octree octree, Triangle *triangles, int triCount, LinkedListNo
                                        MAX(A->y, (MAX(B->y, C->y))),
                                        MAX(A->z, (MAX(B->z, C->z)))};
         int xMin, yMin, zMin;
-        octreeCoords(AABB_min, &xMin, &yMin, &zMin, octree);
+        octreeCoords(AABB_min, &xMin, &yMin, &zMin, *octree);
         int xMax, yMax, zMax;
-        octreeCoords(AABB_max, &xMax, &yMax, &zMax, octree);
+        octreeCoords(AABB_max, &xMax, &yMax, &zMax, *octree);
 
         // iterate voxels within triangle's AABB
         for (int x = xMin; x <= xMax; x++)
@@ -693,13 +759,13 @@ void build_octree(Octree octree, Triangle *triangles, int triCount, LinkedListNo
                 for (int z = zMin; z <= zMax; z++)
                 {
                     // get voxel bounds
-                    Vector3D vMin = voxelOrig(x, y, z, octree);
-                    Vector3D vMax = voxelOrig(x + 1, y + 1, z + 1, octree);
+                    Vector3D vMin = voxelOrig(x, y, z, *octree);
+                    Vector3D vMax = voxelOrig(x + 1, y + 1, z + 1, *octree);
 
                     // check if some part of the current triangles is inside the current voxel
                     if (voxelIntersect(A, B, C, vMin, vMax))
                     {
-                        intptr_t *root = octree.data;
+                        intptr_t *root = octree->data;
                         intptr_t cell_off = 0;
                         for (int b = DEPTH - 1; b >= 0; b--)
                         {
@@ -757,19 +823,19 @@ int main_render(float *buffer, int frame)
     }
     memset(octreeData, 0, tree_size * sizeof(intptr_t));
 
-    Octree octree = (Octree){(Vector3D){world_offset, world_offset, world_offset},
-                             (Vector3D){world_size, world_size, world_size},
+    Octree octree = (Octree){(Vector3D){0, 0, 0},
+                             (Vector3D){1, 1, 1},
                              octreeData};
 
-    build_octree(octree, triangles, faceCount, nodes);
+    build_octree(&octree, triangles, faceCount, nodes);
 
     time_t octree_build_end = clock();
 
     // printf("\nvoxelization ok\n");
 
     float a = (float)frame*.05;
-    float d = 20.;
-    Vector3D p = (Vector3D){sinf(a)*d, 0.01, -cosf(a)*d};
+    float d = 1.;
+    Vector3D p = (Vector3D){sinf(a)*d, 1., -cosf(a)*d};
     // Vector3D rd = normalize((Vector3D){-.3, .05, -.5});
     // LinkedListNode *hit = rayCast_voxel_octree(p, rd, octree);
     // exit(0);
@@ -811,7 +877,10 @@ int main_render(float *buffer, int frame)
             }
             else
             {
-                px[0] = .5-.25*dot(rd,sd), px[1] = .5, px[2] = .5;   
+                if(hit.d>0)
+                    px[0] = .5, px[1] = 0, px[2] = 0;
+                else 
+                    px[0] = .5-.25*dot(rd,sd), px[1] = .5, px[2] = .5;   
             }
         }
     }
@@ -824,23 +893,24 @@ int main_render(float *buffer, int frame)
         start0 = end;
     }
 
-
-    // printf("octree build time: %f s\n", (float)(octree_build_end - start) / CLOCKS_PER_SEC);
-    // printf("rendering time: %f s\n", (float)(end - octree_build_end) / CLOCKS_PER_SEC);
-    // printf("frame time: %f s\n\n", (float)(end - start) / CLOCKS_PER_SEC);
+    #if 0
+    printf("octree build time: %f s\n", (float)(octree_build_end - start) / CLOCKS_PER_SEC);
+    printf("rendering time: %f s\n", (float)(end - octree_build_end) / CLOCKS_PER_SEC);
+    printf("frame time: %f s\n\n", (float)(end - start) / CLOCKS_PER_SEC);
+    #endif
 
     if (0)
     {
         // debugging 2D slice of the octree
         int j = 15;
-        float y = world_offset + world_size * (31 - j) / 32.;
+        float y = octree.world_offset.y + octree.world_size.y * (31 - j) / 32.;
         for (int i = 0; i < 64; i++)
         {
-            float x = world_offset + world_size * i / 64.;
+            float x = octree.world_offset.x + octree.world_size.x * i / 64.;
             bool hit = false;
             for (int k = 0; k < octree_span; k++)
             {
-                float z = world_offset + world_size * k / (float)octree_span;
+                float z = octree.world_offset.z + octree.world_size.z * k / (float)octree_span;
                 int xi, yi, zi;
                 octreeCoords((Vector3D){x, y, z}, &xi, &yi, &zi, octree);
                 // printf("x:%d\t,y:%d\t,z:%d\n", xi, yi, zi);
@@ -924,7 +994,7 @@ void clearBuffer(FrameBuffer buffer)
 
 void loadObj()
 {
-    char *path = "teapot.obj";
+    char *path = "output.obj";
     faceCount = 0;
     int vertexCount = 0, normalCount = 0, uvCount = 0;
     if (countObjects(path, &vertexCount, &normalCount, &faceCount, &uvCount))
