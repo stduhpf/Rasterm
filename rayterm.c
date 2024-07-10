@@ -615,17 +615,24 @@ HitResult rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
             {
                 LinkedListNode * node = ((LinkedListNode *)cell[loc]);
                 bool hit = false;
+                #ifdef VOXELIZE_RENDER
+                    HitResult res = rayTriangleIntersect(ro, rd, node->T);
+                    res.P = ro;
+                    return res;
+                #endif
+                HitResult res = (HitResult){.T = NULL, .t = 1e6};
                 while (node != NULL)
                 {
                     // triChecks++;
-                    HitResult res = rayTriangleIntersect(ro, rd, node->T);
-                    if(res.t>0)
-                    {
-                        // TODO handle uv
-                        return res;
-                    }
+                    HitResult tri = rayTriangleIntersect(ro, rd, node->T);
+                    if(tri.t>0 && tri.t<res.t)
+                        res = tri;
                     node = node->next;
                 }
+                if(res.T != NULL)
+                    return res;
+                
+        
                 // no triangle intersection, keep going to next leaf
                 ro = voxelSkipLOD(ro, rd, 0, octree);
                 break;
