@@ -310,27 +310,34 @@ HitResult rayTriangleIntersect(Vector3D ro, Vector3D rd, Triangle * tri){
     HitResult result = {.T = tri,.t = -1};
 
     // maybe normal too
-    Vector3D a = (Vector3D){tri->B->x - tri->A->x, tri->B->y - tri->A->y, tri->B->z - tri->A->z};
-    Vector3D b = (Vector3D){tri->C->x - tri->A->x, tri->C->y - tri->A->y, tri->C->z - tri->A->z};
+    Vector3D a = (Vector3D){tri->A->x - tri->C->x, tri->A->y - tri->C->y, tri->A->z - tri->C->z};
+    Vector3D b = (Vector3D){tri->B->x - tri->C->x, tri->B->y - tri->C->y, tri->B->z - tri->C->z};
 
-    Vector3D o = (Vector3D){ro.x - tri->A->x, ro.y - tri->A->y, ro.z - tri->A->z};
+    Vector3D R = (Vector3D){ro.x - tri->C->x, ro.y - tri->C->y, ro.z - tri->C->z};
 
     Vector3D n = cross(a, b);
 
-    float h = -dot(o, n)/dot(rd, n);
+    float h = -dot(R, n)/dot(rd, n);
 
-    Vector3D p = (Vector3D){o.x + h*rd.x, o.y + h*rd.y, o.z + h*rd.z};
+    Vector3D p = (Vector3D){R.x + h*rd.x, R.y + h*rd.y, R.z + h*rd.z};
+
+    Vector3D iA = cross(p, b);
+    Vector3D iB = cross(a, p);
+
+    float nsq = dot(n, n);
 
     //now we calculate u and v
-    float u = dot(cross(p, b), n)/dot(n, n);
-    float v = dot(cross(a, p), n)/dot(n, n);
+    float u = dot(iA, n)/nsq;
+    float v = dot(iB, n)/nsq;
 
     if(u >= 0 && v >= 0 && u + v <= 1){
         result.t = h;
-        result.UV = (Vector2D){u, v};
-        result.P = (Vector3D){p.x + tri->A->x, p.y + tri->A->y, p.z + tri->A->z};
-        result.N = normalize(n);
+        result.P = (Vector3D){p.x + tri->C->x, p.y + tri->C->y, p.z + tri->C->z};
      }
+    result.UV = (Vector2D){u, v};
+    result.N = n;
+    float scale_n = 1/sqrtf(nsq);
+    SCALE_VEC3(result.N, scale_n)
     return result;
 }
 
