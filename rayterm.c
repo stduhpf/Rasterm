@@ -5,6 +5,7 @@
 #include <math.h>
 #include <assert.h>
 #include <time.h>
+#include <omp.h>
 
 // #include "pot.h"
 
@@ -132,6 +133,7 @@ void intCoords(Vector3D coords, int *x, int *y, int *z)
     *y = (int)floorf(coords.y);
     *z = (int)floorf(coords.z);
 }
+
 /**
  * @brief Calculates the integer coordinates for a given 3D vector at a specific level of detail (LoD).
  *
@@ -276,8 +278,22 @@ Vector3D voxelOrigLod(int x, int y, int z, Octree bb, int lod)
     return voxelOrig(x, y, z, bb);
 }
 
+/**
+ * @brief Calculates the intersection of a ray with a triangle.
+ *
+ * This function determines if a ray, defined by its origin (ro) and direction (rd), intersects with a triangle.
+ * The triangle is defined by three vertices (A, B, C). If the ray intersects the triangle, the function returns
+ * the distance from the ray's origin to the intersection point. If the ray does not intersect the triangle,
+ * the function returns -1.
+ *
+ * @param ro The origin of the ray.
+ * @param rd The direction of the ray.
+ * @param tri A pointer to a Triangle structure that contains the vertices of the triangle.
+ * @return The distance from the ray's origin to the intersection point if the ray intersects the triangle, or -1 if it does not.
+ */
 float rayTriangleIntersect(Vector3D ro, Vector3D rd, Triangle  * tri){
-
+    // TODO: expose u and v (barycentric coordinates) to the caller
+    // maybe normal too
     Vector3D a = (Vector3D){tri->B->x - tri->A->x, tri->B->y - tri->A->y, tri->B->z - tri->A->z};
     Vector3D b = (Vector3D){tri->C->x - tri->A->x, tri->C->y - tri->A->y, tri->C->z - tri->A->z};
 
@@ -451,11 +467,6 @@ bool voxelIntersect(Vector3D *A, Vector3D *B, Vector3D *C, Vector3D vMin, Vector
     return false;
 }
 
-float minstep;
-float maxstep;
-int calls;
-
-bool broken;
 
 
 /**
@@ -474,7 +485,7 @@ bool broken;
  */
 Vector3D voxelSkipLOD(Vector3D p, Vector3D rd, int lod, Octree octree)
 {
-    calls++;
+    // calls++;
     
     // current voxel coords in integers
     int x, y, z;
@@ -505,8 +516,8 @@ Vector3D voxelSkipLOD(Vector3D p, Vector3D rd, int lod, Octree octree)
           d = MIN(d, dz);
 
     // assert(d>=0);
-    minstep = MIN(d, minstep);
-    maxstep = MAX(d, maxstep);
+    // minstep = MIN(d, minstep);
+    // maxstep = MAX(d, maxstep);
 
     d += eps;
 
@@ -514,20 +525,20 @@ Vector3D voxelSkipLOD(Vector3D p, Vector3D rd, int lod, Octree octree)
                                p.y + d * rd.y,
                                p.z + d * rd.z};
 
-    int retx, rety, retz;
-    octreeCoordsLod(ret, &retx, &rety, &retz, octree, lod);
+    // int retx, rety, retz;
+    // octreeCoordsLod(ret, &retx, &rety, &retz, octree, lod);
 
-    if (retx == x && rety == y && retz == z){
-        // shouldn't be possible, but here we are
-        // printf("broken\n");
-        broken = true;
-    }
+    // if (retx == x && rety == y && retz == z){
+    //     // shouldn't be possible, but here we are
+    //     // printf("broken\n");
+    //     broken = true;
+    // }
 
     return ret;
 }
 
-int minB;
-int triChecks;
+// int minB;
+// int triChecks;
 
 bool inBounds(Vector3D p, Octree octree){
     return p.x >= octree.world_offset.x && p.x < octree.world_size.x + octree.world_offset.x 
@@ -546,17 +557,17 @@ bool inBounds(Vector3D p, Octree octree){
 LinkedListNode *rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
 {
     bool hit = false;
-    minB = DEPTH;
-    minstep = 1e6;
-    maxstep = 0.;
+    // minB = DEPTH;
+    // minstep = 1e6;
+    // maxstep = 0.;
 
     int maxLod = DEPTH - 1;
     // TODO: refactor octree system to allow flexibility over its bounds
     while (inBounds(ro, octree))
     {
-        if(broken){
-            return NULL;
-        }
+        // if(broken){
+        //     return NULL;
+        // }
         int cellX, cellY, cellZ;
         octreeCoords(ro, &cellX, &cellY, &cellZ, octree);
 
@@ -566,7 +577,7 @@ LinkedListNode *rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
         // TODO: smarter starting LOD depending on previous step?
         for (int b = maxLod; b >= 0; b--)
         {
-            minB = MIN(b, minB);
+            // minB = MIN(b, minB);
 
             int cx = (cellX >> b) & 1;
             int cy = (cellY >> b) & 1;
@@ -587,26 +598,17 @@ LinkedListNode *rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
                 bool hit = false;
                 while (node != NULL)
                 {
-                    triChecks++;
+                    // triChecks++;
                     if(rayTriangleIntersect(ro, rd, node->T)>0)
                     {
-                        hit = true;
-                        break;
+                        // TODO handle uv
+                        return node;
                     }
                     node = node->next;
                 }
-
-                if (hit)
-                {
-                    // hit something, end of loop
-                    return node;
-                }
-                else
-                {
-                    // no triangle intersection, keep going to next leaf
-                    ro = voxelSkipLOD(ro, rd, 0, octree);
-                    break;
-                } 
+                // no triangle intersection, keep going to next leaf
+                ro = voxelSkipLOD(ro, rd, 0, octree);
+                break;
             }
             else
             {
@@ -702,12 +704,16 @@ void build_octree(Octree octree, Triangle *triangles, int triCount, LinkedListNo
     }
 }
 
+time_t start0 = 0;
+
 int main_render(float *buffer, int frame)
 {
 
     //TODO avoid rebuilding and allocating octree every frame
 
     time_t start = clock();
+    if(start0 == 0)
+        start0 = start;
 
     FrameBuffer fBuffer = (FrameBuffer){buffer, WIDTH, HEIGHT};
 
@@ -744,6 +750,7 @@ int main_render(float *buffer, int frame)
     // LinkedListNode *hit = rayCast_voxel_octree(p, rd, octree);
     // exit(0);
 
+    #pragma omp parallel for
     for (int j = 0; j < HEIGHT; j++)
     {
         float v = ((float)HEIGHT / 2. - j) / (float)HEIGHT;
@@ -759,9 +766,6 @@ int main_render(float *buffer, int frame)
             rd.x = x;
             rd.z = z;
 
-            broken = false;
-            calls = 0;
-            triChecks = 0;
 
             LinkedListNode *hit = rayCast_voxel_octree(p, rd, octree);
 
@@ -775,31 +779,27 @@ int main_render(float *buffer, int frame)
             }
             else
             {
-
-                if(broken){
-                    px[0] = 1, px[1] = 0, px[2] = 0;
-                }else{
-                    // debug colors
-                    float treeDepth = 1. - (minB) / (float)(DEPTH);
-                    float mind =  1. - exp2f(-minstep * 2.);
-                    float maxd = 1. - exp2f(-maxstep * .1);
-
-                    float calld = 1. - exp2f(-.1*(float)calls);
-                    float calld2 = 1. - exp2f(-1.*(float)triChecks);
-                    px[0] = calld, px[1] = calld, px[2] = calld;
-                }
+                px[0] = .5-.25*rd.y, px[1] = .5, px[2] = .5;   
             }
         }
     }
     time_t end = clock();
 
+    #define AVG_WINDOW 100
+    if (frame && frame % AVG_WINDOW == 0){
+        printf("avg frame time: %f s\n\n", (float)(end - start0) / (CLOCKS_PER_SEC*AVG_WINDOW) );
+        printf("FPS: %f\n", (float)AVG_WINDOW / ((float)(end - start0) / (CLOCKS_PER_SEC)) );
+        start0 = end;
+    }
 
-    printf("octree build time: %f s\n", (float)(octree_build_end - start) / CLOCKS_PER_SEC);
-    printf("rendering time: %f s\n", (float)(end - octree_build_end) / CLOCKS_PER_SEC);
-    printf("frame time: %f s\n\n", (float)(end - start) / CLOCKS_PER_SEC);
+
+    // printf("octree build time: %f s\n", (float)(octree_build_end - start) / CLOCKS_PER_SEC);
+    // printf("rendering time: %f s\n", (float)(end - octree_build_end) / CLOCKS_PER_SEC);
+    // printf("frame time: %f s\n\n", (float)(end - start) / CLOCKS_PER_SEC);
 
     if (0)
     {
+        // debugging 2D slice of the octree
         int j = 15;
         float y = world_offset + world_size * (31 - j) / 32.;
         for (int i = 0; i < 64; i++)
