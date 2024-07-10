@@ -366,7 +366,7 @@ bool edgeIntersect(float ax, float ay, float bx, float by, float edgeX, float mi
     if (da * db <= 0)
     {
         // points are on opposite sides of the edge line
-        // projection:
+        // projection on the edge to get intersection point:
         float dea = (ax - edgeX);
         float dba = (ax - bx);
 
@@ -393,6 +393,9 @@ bool edgeIntersect(float ax, float ay, float bx, float by, float edgeX, float mi
  */
 bool faceIntersect(Vector3D A, Vector3D B, Vector3D C, float faceX, float minY, float maxY, float minZ, float maxZ)
 {
+    // the triangle intesects the face if any of the follwing conditions are true:
+    // 1. any of the points of intersection between the triangle and the plane are inside the face
+    // 2. any of the edges of the triangle intersects any of the edges of the face
     float dA = (A.x - faceX);
     float dB = (B.x - faceX);
     float dC = (C.x - faceX);
@@ -430,18 +433,14 @@ bool faceIntersect(Vector3D A, Vector3D B, Vector3D C, float faceX, float minY, 
         float by = c->y + (b->y - c->y) * gb;
         float bz = c->z + (b->z - c->z) * gb;
 
-        // vector from projected a to projected b
-        float dy = by - ay, dz = bz - az;
-
-
-        // now we do 2D intersection of segment and cube
+        // now we do 2D intersection of segment and rectangle
 
         bool pointAInFace = ay >= minY && ay <= maxY && az >= minZ && az <= maxZ;
         bool pointBInFace = by >= minY && by <= maxY && bz >= minZ && bz <= maxZ;
         bool pointInFace = pointAInFace || pointBInFace;
 
         if (pointInFace)
-            // this means at least one triangle edge gos through the face
+            // this means at least one triangle edge goes through the face
             return true;
         // iterate face edges
         else if (edgeIntersect(ay, az, by, bz, minY, minZ, maxZ))
@@ -467,6 +466,11 @@ bool faceIntersect(Vector3D A, Vector3D B, Vector3D C, float faceX, float minY, 
  */
 bool voxelIntersect(Vector3D *A, Vector3D *B, Vector3D *C, Vector3D vMin, Vector3D vMax)
 {
+    // the triangle intersects the voxel if any of the following is true:
+    // - any of the triangle vertices is inside the voxel
+    // - any of the triangle edges intersects any of the 6 voxel faces
+
+    // first we check if any of the vertices is inside the voxel
     bool vAInVoxel = A->x >= vMin.x && A->x <= vMax.x && A->y >= vMin.y && A->y <= vMax.y && A->z >= vMin.z && A->z <= vMax.z;
     bool vBInVoxel = B->x >= vMin.x && B->x <= vMax.x && B->y >= vMin.y && B->y <= vMax.y && B->z >= vMin.z && B->z <= vMax.z;
     bool vCInVoxel = C->x >= vMin.x && C->x <= vMax.x && C->y >= vMin.y && C->y <= vMax.y && C->z >= vMin.z && C->z <= vMax.z;
@@ -477,7 +481,8 @@ bool voxelIntersect(Vector3D *A, Vector3D *B, Vector3D *C, Vector3D vMin, Vector
     Vector3D Az = (Vector3D){A->z, A->x, A->y}, Bz = (Vector3D){B->z, B->x, B->y}, Cz = (Vector3D){C->z, C->x, C->y};
     if (vertexInVoxel)
         return true;
-    // iterate voxel faces
+    
+    // then we check if any of the edges intersects any of the voxel faces
     else if (faceIntersect(*A, *B, *C, vMin.x, vMin.y, vMax.y, vMin.z, vMax.z))
         return true;
     else if (faceIntersect(*A, *B, *C, vMax.x, vMin.y, vMax.y, vMin.z, vMax.z))
@@ -541,24 +546,11 @@ Vector3D voxelSkipLOD(Vector3D p, Vector3D rd, int lod, Octree octree)
     float d = MIN(dx, dy);
           d = MIN(d, dz);
 
-    // assert(d>=0);
-    // minstep = MIN(d, minstep);
-    // maxstep = MAX(d, maxstep);
-
     d += eps;
 
     Vector3D ret = (Vector3D){ p.x + d * rd.x,
                                p.y + d * rd.y,
                                p.z + d * rd.z};
-
-    // int retx, rety, retz;
-    // octreeCoordsLod(ret, &retx, &rety, &retz, octree, lod);
-
-    // if (retx == x && rety == y && retz == z){
-    //     // shouldn't be possible, but here we are
-    //     // printf("broken\n");
-    //     broken = true;
-    // }
 
     return ret;
 }
