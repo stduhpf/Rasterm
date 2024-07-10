@@ -39,6 +39,18 @@ typedef struct LinkedListStruct
     Triangle *T;
     struct LinkedListStruct *next;
 } LinkedListNode;
+
+typedef struct
+{
+    Triangle *T;
+    float t;
+    Vector3D P;
+    Vector3D N;
+    Vector2D UV;
+} HitResult;
+ 
+
+
 #ifdef MIN
 #undef MIN
 #endif
@@ -291,8 +303,12 @@ Vector3D voxelOrigLod(int x, int y, int z, Octree bb, int lod)
  * @param tri A pointer to a Triangle structure that contains the vertices of the triangle.
  * @return The distance from the ray's origin to the intersection point if the ray intersects the triangle, or -1 if it does not.
  */
-float rayTriangleIntersect(Vector3D ro, Vector3D rd, Triangle  * tri){
+HitResult rayTriangleIntersect(Vector3D ro, Vector3D rd, Triangle * tri){
+
     // TODO: expose u and v (barycentric coordinates) to the caller
+
+    HitResult result = {.T = tri,.t = -1};
+
     // maybe normal too
     Vector3D a = (Vector3D){tri->B->x - tri->A->x, tri->B->y - tri->A->y, tri->B->z - tri->A->z};
     Vector3D b = (Vector3D){tri->C->x - tri->A->x, tri->C->y - tri->A->y, tri->C->z - tri->A->z};
@@ -310,9 +326,12 @@ float rayTriangleIntersect(Vector3D ro, Vector3D rd, Triangle  * tri){
     float v = dot(cross(a, p), n)/dot(n, n);
 
     if(u >= 0 && v >= 0 && u + v <= 1){
-        return h;
+        result.t = h;
+        result.UV = (Vector2D){u, v};
+        result.P = (Vector3D){p.x + tri->A->x, p.y + tri->A->y, p.z + tri->A->z};
+        result.N = normalize(n);
      }
-     return -1;
+    return result;
 }
 
 
@@ -554,7 +573,7 @@ bool inBounds(Vector3D p, Octree octree){
  * @param octree octree structure
  * @return LinkedListNode* the content of the intersected voxel (NULL if no hit)
  */
-LinkedListNode *rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
+HitResult rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
 {
     bool hit = false;
     // minB = DEPTH;
@@ -599,10 +618,11 @@ LinkedListNode *rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
                 while (node != NULL)
                 {
                     // triChecks++;
-                    if(rayTriangleIntersect(ro, rd, node->T)>0)
+                    HitResult res = rayTriangleIntersect(ro, rd, node->T);
+                    if(res.t>0)
                     {
                         // TODO handle uv
-                        return node;
+                        return res;
                     }
                     node = node->next;
                 }
@@ -619,8 +639,8 @@ LinkedListNode *rayCast_voxel_octree(Vector3D ro, Vector3D rd, Octree octree)
             }
         }
     }
+    return (HitResult){.T =NULL, .t = -1};
     // no hits
-    return NULL;
 }
 
 /**
@@ -750,6 +770,9 @@ int main_render(float *buffer, int frame)
     // LinkedListNode *hit = rayCast_voxel_octree(p, rd, octree);
     // exit(0);
 
+    // shadow direction
+    Vector3D sd = normalize((Vector3D){0, 1, .5});
+
     #pragma omp parallel for
     for (int j = 0; j < HEIGHT; j++)
     {
@@ -767,19 +790,24 @@ int main_render(float *buffer, int frame)
             rd.z = z;
 
 
-            LinkedListNode *hit = rayCast_voxel_octree(p, rd, octree);
+            HitResult hit = rayCast_voxel_octree(p, rd, octree);
 
-            if (hit)
+            if (hit.T)
             {
-                // hash triangles to get a color
-                float x = 1000. + 30.14 * hit->T->B->x;
-                float y = 1000. + 30.14 * hit->T->B->y;
-                float z = 1000. + 30.14 * hit->T->B->z;
-                px[0] = (x - (int)x), px[1] = (y - (int)y), px[2] = (z - (int)z);
+                float l = MAX(dot(hit.N, sd),0);
+                
+                Vector3D rayStart = (Vector3D){hit.P.x + sd.x * .001, hit.P.y + sd.y * .001, hit.P.z + sd.z * .001};
+                HitResult shadowHit = rayCast_voxel_octree(rayStart, sd, octree);
+
+                if(shadowHit.T)
+                    l *= 0.;
+                l+=.05;
+
+                px[0] = l, px[1] = l, px[2] = l;
             }
             else
             {
-                px[0] = .5-.25*rd.y, px[1] = .5, px[2] = .5;   
+                px[0] = .5-.25*dot(rd,sd), px[1] = .5, px[2] = .5;   
             }
         }
     }
