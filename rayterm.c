@@ -775,10 +775,8 @@ int main_render(float *buffer, int frame)
 
     // printf("\nvoxelization ok\n");
 
-    //  Traverse octree ( arbitrary ray)
-
-    float a = (float)frame*.1;
-    float d = 30.;
+    float a = (float)frame*.05;
+    float d = 20.;
     Vector3D p = (Vector3D){sinf(a)*d, 0.01, -cosf(a)*d};
     // Vector3D rd = normalize((Vector3D){-.3, .05, -.5});
     // LinkedListNode *hit = rayCast_voxel_octree(p, rd, octree);
@@ -817,7 +815,7 @@ int main_render(float *buffer, int frame)
                     l *= 0.;
                 l+=.05;
 
-                px[0] = l, px[1] = l, px[2] = l;
+                px[0] = l*hit.UV.x, px[1] = l*hit.UV.y, px[2] = l;
             }
             else
             {
