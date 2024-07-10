@@ -17,6 +17,10 @@ typedef struct
     int Cuv;
 } Face;
 
+// TODO: support higher order polygons (triangulation)
+// requires parsing all faces in countObjects and calculating the number of corresponding triangles
+// and then Just use the triangle fan method to convert the polygon to triangles
+
 bool countObjects(char *filename, int *vertexCount, int *normalCount, int *faceCount, int *uvCount)
 {
     FILE *fptr;
@@ -80,6 +84,7 @@ bool countObjects(char *filename, int *vertexCount, int *normalCount, int *faceC
     fclose(fptr);
     return true;
 }
+
 
 bool parseObjects(char *filename, Vector3D *vertices, Vector3D *normals, Face *faces, Vector2D *uvs)
 {
